@@ -34,6 +34,8 @@ Manual install: copy `custom_components/homelab_cards` to `/config/custom_compon
 | [Android TV Remote](https://www.home-assistant.io/integrations/androidtv_remote/) | built-in |
 | [Intex Spa](https://github.com/mathieu-mp/homeassistant-intex-spa) | HACS custom integration |
 | [Portainer](https://www.home-assistant.io/integrations/portainer/) | built-in |
+| [Battery entities (any integration)](https://www.home-assistant.io/integrations/sensor/#device-class) | built-in |
+| [Climate entities (Netatmo, HomeKit, Tado, Zigbee…)](https://www.home-assistant.io/integrations/climate/) | built-in |
 
 “HACS” integrations must be installed first; “built-in” ones ship with Home Assistant.
 
@@ -80,6 +82,9 @@ Manual install: copy `custom_components/homelab_cards` to `/config/custom_compon
 | Card | Requires | |
 |---|---|---|
 | `custom:intex-spa-card` | [Intex Spa](https://github.com/mathieu-mp/homeassistant-intex-spa) | Intex spa: temperature, heating, filtration, bubbles, jets, bubble and steam animations. |
+| `custom:battery-inventory-card` | [Battery entities (any integration)](https://www.home-assistant.io/integrations/sensor/#device-class) | Batteries grouped by battery type (CR2032, AA, 2xAAA…): levels, alert thresholds, sorting and a “to buy” summary. ⚠️ Works without configuration: every detected battery entity is shown, then sort them into types from the editor. |
+| `custom:thermostat-control-card` | [Climate entities (Netatmo, HomeKit, Tado, Zigbee…)](https://www.home-assistant.io/integrations/climate/) | Thermostat: temperature gauge, −/+ setpoint, modes, presets, humidity, active schedule and built-in history. ⚠️ Works with any climate entity; a fallback entity can take over when the main one is unavailable. |
+| `custom:valve-control-card` | [Climate entities (Netatmo, HomeKit, Tado, Zigbee…)](https://www.home-assistant.io/integrations/climate/) | Thermostatic radiator valve: temperature gauge, opening / heating demand, −/+ setpoint, presets, battery, room valves and built-in history. ⚠️ Works with any climate entity; the opening is read from an attribute (heating_power_request by default, configurable via power_attribute). |
 
 ### Containers
 

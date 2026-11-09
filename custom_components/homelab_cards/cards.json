@@ -65,6 +65,16 @@
    "name": "Portainer",
    "url": "https://www.home-assistant.io/integrations/portainer/",
    "kind": "core"
+  },
+  "battery": {
+   "name": "Battery entities (any integration)",
+   "url": "https://www.home-assistant.io/integrations/sensor/#device-class",
+   "kind": "core"
+  },
+  "climate": {
+   "name": "Climate entities (Netatmo, HomeKit, Tado, Zigbee…)",
+   "url": "https://www.home-assistant.io/integrations/climate/",
+   "kind": "core"
   }
  },
  "cards": [
@@ -347,6 +357,63 @@
    "name": {
     "en": "Intex Spa",
     "fr": "Spa Intex"
+   }
+  },
+  {
+   "id": "battery-inventory",
+   "category": "home",
+   "type": "custom:battery-inventory-card",
+   "file": "home/battery-inventory-card.js",
+   "integration": "battery",
+   "desc": {
+    "fr": "Piles et batteries classées par type de pile (CR2032, AA, 2xAAA…) : niveaux, seuils d'alerte, tri et résumé « à racheter ».",
+    "en": "Batteries grouped by battery type (CR2032, AA, 2xAAA…): levels, alert thresholds, sorting and a “to buy” summary."
+   },
+   "note": {
+    "fr": "Fonctionne sans configuration : toutes les entités batterie détectées s'affichent, à ranger ensuite par type depuis l'éditeur.",
+    "en": "Works without configuration: every detected battery entity is shown, then sort them into types from the editor."
+   },
+   "name": {
+    "en": "Batteries inventory",
+    "fr": "Piles et batteries"
+   }
+  },
+  {
+   "id": "thermostat-control",
+   "category": "home",
+   "type": "custom:thermostat-control-card",
+   "file": "home/thermostat-control-card.js",
+   "integration": "climate",
+   "desc": {
+    "fr": "Thermostat : jauge de température, consigne −/+, modes, presets, humidité, planning actif et historique intégré.",
+    "en": "Thermostat: temperature gauge, −/+ setpoint, modes, presets, humidity, active schedule and built-in history."
+   },
+   "note": {
+    "fr": "Compatible avec toute entité climate ; une entité de repli peut prendre le relais quand l'entité principale est indisponible.",
+    "en": "Works with any climate entity; a fallback entity can take over when the main one is unavailable."
+   },
+   "name": {
+    "en": "Thermostat",
+    "fr": "Thermostat"
+   }
+  },
+  {
+   "id": "valve-control",
+   "category": "home",
+   "type": "custom:valve-control-card",
+   "file": "home/valve-control-card.js",
+   "integration": "climate",
+   "desc": {
+    "fr": "Vanne thermostatique : jauge de température, ouverture / demande de chauffe, consigne −/+, presets, batterie, vannes de la pièce et historique intégré.",
+    "en": "Thermostatic radiator valve: temperature gauge, opening / heating demand, −/+ setpoint, presets, battery, room valves and built-in history."
+   },
+   "note": {
+    "fr": "Compatible avec toute entité climate ; l'ouverture est lue dans un attribut (heating_power_request par défaut, réglable via power_attribute).",
+    "en": "Works with any climate entity; the opening is read from an attribute (heating_power_request by default, configurable via power_attribute)."
+   },
+   "name": {
+    "en": "Thermostatic valve",
+    "fr": "Vanne thermostatique"
    }
   },
   {

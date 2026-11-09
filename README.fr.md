@@ -34,6 +34,8 @@ Installation manuelle : copiez `custom_components/homelab_cards` dans `/config/c
 | [Android TV Remote](https://www.home-assistant.io/integrations/androidtv_remote/) | native |
 | [Intex Spa](https://github.com/mathieu-mp/homeassistant-intex-spa) | intégration personnalisée HACS |
 | [Portainer](https://www.home-assistant.io/integrations/portainer/) | native |
+| [Battery entities (any integration)](https://www.home-assistant.io/integrations/sensor/#device-class) | native |
+| [Climate entities (Netatmo, HomeKit, Tado, Zigbee…)](https://www.home-assistant.io/integrations/climate/) | native |
 
 Les intégrations « HACS » sont à installer au préalable ; les « natives » sont fournies avec Home Assistant.
 
@@ -80,6 +82,9 @@ Les intégrations « HACS » sont à installer au préalable ; les « natives »
 | Card | Nécessite | |
 |---|---|---|
 | `custom:intex-spa-card` | [Intex Spa](https://github.com/mathieu-mp/homeassistant-intex-spa) | Spa Intex : température, chauffage, filtration, bulles, jets, animations bulles et vapeur. |
+| `custom:battery-inventory-card` | [Battery entities (any integration)](https://www.home-assistant.io/integrations/sensor/#device-class) | Piles et batteries classées par type de pile (CR2032, AA, 2xAAA…) : niveaux, seuils d'alerte, tri et résumé « à racheter ». ⚠️ Fonctionne sans configuration : toutes les entités batterie détectées s'affichent, à ranger ensuite par type depuis l'éditeur. |
+| `custom:thermostat-control-card` | [Climate entities (Netatmo, HomeKit, Tado, Zigbee…)](https://www.home-assistant.io/integrations/climate/) | Thermostat : jauge de température, consigne −/+, modes, presets, humidité, planning actif et historique intégré. ⚠️ Compatible avec toute entité climate ; une entité de repli peut prendre le relais quand l'entité principale est indisponible. |
+| `custom:valve-control-card` | [Climate entities (Netatmo, HomeKit, Tado, Zigbee…)](https://www.home-assistant.io/integrations/climate/) | Vanne thermostatique : jauge de température, ouverture / demande de chauffe, consigne −/+, presets, batterie, vannes de la pièce et historique intégré. ⚠️ Compatible avec toute entité climate ; l'ouverture est lue dans un attribut (heating_power_request par défaut, réglable via power_attribute). |
 
 ### Conteneurs
 

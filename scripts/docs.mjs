@@ -14,6 +14,12 @@ const T = {
       "Reload your browser (Ctrl+Shift+R). HACS registers the resource itself: **nothing to add in `configuration.yaml`**.",
       "Edit a dashboard → **Add card** → search the card name (e.g. “UniFi Gateway”).",
     ],
+    yaml: "**YAML-mode dashboards**: HACS cannot register the resource. Add it yourself under `lovelace: resources:` in `configuration.yaml`, then restart:
+
+```yaml
+- url: /local/community/ha-homelab-cards/ha-homelab-cards.js
+  type: module
+```",
     manual: "Manual install: copy `dist/ha-homelab-cards.js` to `/config/www/` and add the resource `/local/ha-homelab-cards.js` (type *JavaScript module*).",
     cards: "Cards", integ: "Required integrations", needs: "Requires", core: "built-in", hacs: "HACS custom integration",
     legend: "“HACS” integrations must be installed first; “built-in” ones ship with Home Assistant.",
@@ -31,6 +37,12 @@ const T = {
       "Rechargez le navigateur (Ctrl+Shift+R). HACS déclare la ressource lui-même : **rien à ajouter dans `configuration.yaml`**.",
       "Modifiez un tableau de bord → **Ajouter une carte** → cherchez le nom de la carte (ex. « UniFi Gateway »).",
     ],
+    yaml: "**Tableaux de bord en mode YAML** : HACS ne peut pas déclarer la ressource. Ajoutez-la vous-même dans `lovelace: resources:` de `configuration.yaml`, puis redémarrez :
+
+```yaml
+- url: /local/community/ha-homelab-cards/ha-homelab-cards.js
+  type: module
+```",
     manual: "Installation manuelle : copiez `dist/ha-homelab-cards.js` dans `/config/www/` et ajoutez la ressource `/local/ha-homelab-cards.js` (type *Module JavaScript*).",
     cards: "Cartes", integ: "Intégrations requises", needs: "Nécessite", core: "native", hacs: "intégration personnalisée HACS",
     legend: "Les intégrations « HACS » sont à installer au préalable ; les « natives » sont fournies avec Home Assistant.",

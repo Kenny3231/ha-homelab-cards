@@ -12,6 +12,13 @@ Cartes Lovelace pour homelab Home Assistant : UniFi, Proxmox, Synology, Transmis
 4. Rechargez le navigateur (Ctrl+Shift+R). HACS déclare la ressource lui-même : **rien à ajouter dans `configuration.yaml`**.
 5. Modifiez un tableau de bord → **Ajouter une carte** → cherchez le nom de la carte (ex. « UniFi Gateway »).
 
+**Tableaux de bord en mode YAML** : HACS ne peut pas déclarer la ressource. Ajoutez-la vous-même dans `lovelace: resources:` de `configuration.yaml`, puis redémarrez :
+
+```yaml
+- url: /local/community/ha-homelab-cards/ha-homelab-cards.js
+  type: module
+```
+
 Installation manuelle : copiez `dist/ha-homelab-cards.js` dans `/config/www/` et ajoutez la ressource `/local/ha-homelab-cards.js` (type *Module JavaScript*).
 
 ## Intégrations requises

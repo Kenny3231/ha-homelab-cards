@@ -1,73 +1,216 @@
+const REPO = "https://github.com/Kenny3231/ha-homelab-cards";
 const I18N = {
   fr: {
-    nav_install: "Installation", nav_cards: "Cartes", nav_req: "Prérequis",
-    h1: "Des cartes Lovelace pensées pour votre homelab",
-    lead: "UniFi, Proxmox, Synology, Transmission, DNS Technitium, Android TV… Zéro dépendance, éditeur visuel inclus, installation en un clic via HACS.",
+    skip: "Aller au contenu",
+    nav_install: "Installation", nav_cards: "Cartes", nav_editor: "Éditeur", nav_req: "Intégrations",
+    h1: "Votre homelab, <em>en un coup d'œil</em> dans Home Assistant",
+    lead: "Des cartes Lovelace soignées pour UniFi, Proxmox, Synology, Transmission, DNS Technitium et Android TV. Zéro dépendance, éditeur visuel intégré, installation en un clic via HACS.",
     cta_gh: "Voir sur GitHub", cta_install: "Installer",
+    facts: (n, c) => [`<b>${n}</b> cartes`, `<b>${c}</b> catégories`, "Éditeur visuel", "Zéro dépendance"],
     h_install: "Installation avec HACS",
+    install_lead: "Cinq étapes, deux minutes. HACS se charge du téléchargement et des mises à jour.",
     steps: [
-      "Dans HACS, menu ⋮ → <b>Dépôts personnalisés</b>.",
-      "Ajoutez <code>https://github.com/Kenny3231/ha-homelab-cards</code> avec le type <b>Tableau de bord</b>.",
+      "Dans HACS, ouvrez le menu <b>⋮</b> puis <b>Dépôts personnalisés</b>.",
+      "Collez l'adresse du dépôt et choisissez le type <b>Tableau de bord</b>.",
       "Cherchez <b>Homelab Cards</b> et cliquez sur <b>Télécharger</b>.",
-      "Rechargez le navigateur (<code>Ctrl+Shift+R</code>).",
+      "Rechargez le navigateur (<code>Ctrl+Shift+R</code>) pour charger les cartes.",
       "Modifiez un tableau de bord → <b>Ajouter une carte</b> → choisissez une carte Homelab.",
     ],
+    copy: "Copier", copied: "Copié",
+    quick_h: "Raccourci My Home Assistant",
+    quick_p: "Ouvre directement le dépôt dans le HACS de votre instance, sans copier-coller.",
+    quick_btn: "Ouvrir dans HACS",
     no_yaml: "HACS déclare la ressource automatiquement : rien à écrire dans configuration.yaml.",
-    h_cards: "Les cartes", requires: "Nécessite", details: "Exemple de configuration",
-    h_req: "Intégrations nécessaires", req_lead: "Chaque carte lit les entités d'une intégration Home Assistant. Installez d'abord celle qui vous concerne.",
-    th_integ: "Intégration", th_kind: "Type", th_cards: "Cartes concernées",
-    core: "Native (incluse dans Home Assistant)", hacs: "Personnalisée (à installer via HACS)",
-    h_soon: "Bientôt", soon: "De nouvelles cartes arrivent dans les prochaines versions (Portainer, etc.).",
-    foot: "Projet communautaire pour Home Assistant",
+    h_cards: "Les cartes",
+    cards_lead: "Chaque carte lit les entités d'une intégration Home Assistant. Filtrez par catégorie, cliquez sur une capture pour l'agrandir.",
+    all: "Toutes", shown: (n) => `${n} carte${n > 1 ? "s" : ""} affichée${n > 1 ? "s" : ""}`,
+    requires: "Nécessite", core_s: "Native", hacs_s: "HACS",
+    zoom: "Agrandir la capture de", no_shot: "Capture à venir",
+    h_editor: "Éditeur visuel",
+    editor_lead: "Chaque carte embarque son propre éditeur dans l'interface de Home Assistant : plus besoin d'écrire du YAML à la main.",
+    perks: [
+      ["Sélecteurs d'entités", "Choisissez vos capteurs dans des listes, filtrées par intégration."],
+      ["Aperçu en direct", "Le rendu se met à jour à chaque modification."],
+      ["YAML toujours possible", "L'éditeur de code reste disponible pour les réglages avancés."],
+    ],
+    editor_win: "Éditeur", card_win: "Résultat",
+    editor_cap: (n) => `Éditeur visuel de <b>${n}</b> : entités, sections et couleurs se règlent depuis l'interface.`,
+    h_req: "Intégrations nécessaires",
+    req_lead: "Installez d'abord l'intégration correspondant à votre matériel. Les natives sont incluses dans Home Assistant ; les autres s'ajoutent via HACS.",
+    core_h: "Natives", core_p: "Incluses dans Home Assistant : Paramètres → Appareils et services → Ajouter une intégration.",
+    hacs_h: "À installer via HACS", hacs_p: "Intégrations personnalisées, à ajouter depuis HACS avant la carte.",
+    n_cards: (n) => `${n} carte${n > 1 ? "s" : ""}`,
+    h_soon: "Bientôt", soon: "De nouvelles cartes arrivent dans les prochaines versions.",
+    soon_portainer: "Conteneurs, piles et état des endpoints Portainer.",
+    idea_h: "Une idée de carte ?", idea_p: "Proposez-la dans les issues GitHub.",
+    foot: "Projet communautaire pour Home Assistant", foot_aff: "non affilié à Nabu Casa",
+    close: "Fermer",
   },
   en: {
-    nav_install: "Install", nav_cards: "Cards", nav_req: "Requirements",
-    h1: "Lovelace cards built for your homelab",
-    lead: "UniFi, Proxmox, Synology, Transmission, Technitium DNS, Android TV… Zero dependency, visual editor included, one-click install through HACS.",
+    skip: "Skip to content",
+    nav_install: "Install", nav_cards: "Cards", nav_editor: "Editor", nav_req: "Integrations",
+    h1: "Your homelab, <em>at a glance</em> in Home Assistant",
+    lead: "Polished Lovelace cards for UniFi, Proxmox, Synology, Transmission, Technitium DNS and Android TV. Zero dependency, built-in visual editor, one-click install through HACS.",
     cta_gh: "View on GitHub", cta_install: "Install",
+    facts: (n, c) => [`<b>${n}</b> cards`, `<b>${c}</b> categories`, "Visual editor", "Zero dependency"],
     h_install: "Install with HACS",
+    install_lead: "Five steps, two minutes. HACS handles the download and future updates.",
     steps: [
-      "In HACS, menu ⋮ → <b>Custom repositories</b>.",
-      "Add <code>https://github.com/Kenny3231/ha-homelab-cards</code> with type <b>Dashboard</b>.",
+      "In HACS, open the <b>⋮</b> menu, then <b>Custom repositories</b>.",
+      "Paste the repository URL and pick the <b>Dashboard</b> type.",
       "Search for <b>Homelab Cards</b> and click <b>Download</b>.",
-      "Reload your browser (<code>Ctrl+Shift+R</code>).",
+      "Reload your browser (<code>Ctrl+Shift+R</code>) to load the cards.",
       "Edit a dashboard → <b>Add card</b> → pick a Homelab card.",
     ],
+    copy: "Copy", copied: "Copied",
+    quick_h: "My Home Assistant shortcut",
+    quick_p: "Opens the repository straight in your instance's HACS, no copy-paste needed.",
+    quick_btn: "Open in HACS",
     no_yaml: "HACS registers the resource for you: nothing to add to configuration.yaml.",
-    h_cards: "The cards", requires: "Requires", details: "Configuration example",
-    h_req: "Required integrations", req_lead: "Each card reads entities from a Home Assistant integration. Install the one you need first.",
-    th_integ: "Integration", th_kind: "Type", th_cards: "Cards",
-    core: "Built-in (ships with Home Assistant)", hacs: "Custom (install through HACS)",
-    h_soon: "Coming soon", soon: "More cards are planned for upcoming releases (Portainer, etc.).",
-    foot: "Community project for Home Assistant",
+    h_cards: "The cards",
+    cards_lead: "Each card reads entities from a Home Assistant integration. Filter by category, click a screenshot to enlarge it.",
+    all: "All", shown: (n) => `${n} card${n > 1 ? "s" : ""} shown`,
+    requires: "Requires", core_s: "Built-in", hacs_s: "HACS",
+    zoom: "Enlarge screenshot of", no_shot: "Screenshot coming soon",
+    h_editor: "Visual editor",
+    editor_lead: "Every card ships its own editor inside the Home Assistant UI: no more hand-written YAML.",
+    perks: [
+      ["Entity pickers", "Pick your sensors from lists, filtered by integration."],
+      ["Live preview", "The card re-renders on every change."],
+      ["YAML still there", "The code editor stays available for advanced settings."],
+    ],
+    editor_win: "Editor", card_win: "Result",
+    editor_cap: (n) => `<b>${n}</b> visual editor: entities, sections and colors are set from the UI.`,
+    h_req: "Required integrations",
+    req_lead: "Install the integration matching your hardware first. Built-in ones ship with Home Assistant; the others are added through HACS.",
+    core_h: "Built-in", core_p: "Ship with Home Assistant: Settings → Devices & services → Add integration.",
+    hacs_h: "Install through HACS", hacs_p: "Custom integrations, to add from HACS before the card.",
+    n_cards: (n) => `${n} card${n > 1 ? "s" : ""}`,
+    h_soon: "Coming soon", soon: "More cards are planned for upcoming releases.",
+    soon_portainer: "Containers, stacks and endpoint status from Portainer.",
+    idea_h: "Got a card idea?", idea_p: "Suggest it in the GitHub issues.",
+    foot: "Community project for Home Assistant", foot_aff: "not affiliated with Nabu Casa",
+    close: "Close",
   },
 };
 const $ = (s) => document.querySelector(s);
-const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-let data, lang;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const icon = (n) => `<svg class="ic" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const short = (c) => c.type.replace("custom:", "");
+let data, lang, filter = "all", tab = 0;
+
 function render() {
   const t = I18N[lang];
   document.documentElement.lang = lang;
-  document.querySelectorAll("[data-i18n]").forEach((e) => (e.textContent = t[e.dataset.i18n]));
+  document.querySelectorAll("[data-i18n]").forEach((e) => (e.innerHTML = t[e.dataset.i18n]));
   document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === lang));
-  $("#steps").innerHTML = t.steps.map((s) => `<li>${s}</li>`).join("");
-  const chip = (i) => `<a class="chip" href="${i.url}">${esc(i.name)}</a>`;
-  $("#catalog").innerHTML = Object.entries(data.categories).map(([cid, name]) => `
-    <h3>${esc(name[lang])}</h3><div class="grid">${data.cards.filter((c) => c.category === cid).map((c) => {
-      const i = data.integrations[c.integration];
-      return `<article class="card"><img src="img/${c.id}.png" alt="${esc(c.type)}" loading="lazy" onerror="this.remove()">
-        <div class="body"><h4>${esc(c.type.replace("custom:", ""))}</h4><p>${esc(c.desc[lang])}</p>
-        ${c.note ? `<div class="note">${esc(c.note[lang])}</div>` : ""}
-        <div class="chips"><span class="req">${t.requires}</span>${chip(i)}</div>
-        <details><summary>${t.details}</summary><pre><code>type: ${esc(c.type)}</code></pre></details></div></article>`;
-    }).join("")}</div>`).join("");
-  $("#reqs").innerHTML = Object.entries(data.integrations).map(([id, i]) =>
-    `<tr><td><a href="${i.url}">${esc(i.name)}</a></td><td>${t[i.kind]}</td><td>${data.cards.filter((c) => c.integration === id).map((c) => `<code>${esc(c.type.replace("custom:", ""))}</code>`).join(" ")}</td></tr>`).join("");
+  $("#lb-close").setAttribute("aria-label", t.close);
+  const cats = Object.entries(data.categories);
+  $("#facts").innerHTML = t.facts(data.cards.length, cats.length).map((f) => `<li>${icon("check")}<span>${f}</span></li>`).join("");
+
+  $("#steps").innerHTML = t.steps.map((s, i) => `<li>${s}${i === 1 ? `<div class="copy"><code id="repo-url">${REPO}</code><button type="button" data-copy>${icon("copy")}<span>${t.copy}</span></button></div>` : ""}</li>`).join("");
+
+  $("#filters").setAttribute("aria-label", t.h_cards);
+  $("#filters").innerHTML = [["all", t.all, data.cards.length], ...cats.map(([id, n]) => [id, n[lang], data.cards.filter((c) => c.category === id).length])]
+    .map(([id, name, n]) => `<button type="button" data-filter="${id}" aria-pressed="${id === filter}">${id === "all" ? "" : icon(id)}${esc(name)}<span class="n">${n}</span></button>`).join("");
+
+  $("#catalog").innerHTML = data.cards.map((c) => {
+    const i = data.integrations[c.integration];
+    return `<article class="tile" id="card-${c.id}" data-cat="${c.category}">
+      <button type="button" class="shot" data-zoom="img/${c.id}.png" data-cap="${esc(short(c))}" aria-label="${t.zoom} ${esc(short(c))}">
+        <img src="img/${c.id}.png" alt="${esc(short(c))}" loading="lazy" data-cat="${c.category}"><span class="zoom">${icon("zoom")}</span></button>
+      <div class="tile-body">
+        <div class="tile-head"><div><h3>${esc(short(c))}</h3><div class="cat">${icon(c.category)}${esc(data.categories[c.category][lang])}</div></div>
+          <span class="kind ${i.kind}">${i.kind === "core" ? t.core_s : t.hacs_s}</span></div>
+        <p class="desc">${esc(c.desc[lang])}</p>
+        ${c.note ? `<div class="note" role="note">${icon("warn")}<span>${esc(c.note[lang])}</span></div>` : ""}
+        <div class="tile-foot"><span>${t.requires}</span><a class="chip" href="${i.url}">${esc(i.name)}${icon("ext")}</a><code>type: ${esc(c.type)}</code></div>
+      </div></article>`;
+  }).join("");
+  applyFilter(false);
+
+  $("#perks").innerHTML = t.perks.map(([h, p]) => `<li>${icon("check")}<span><b>${h}</b>${p}</span></li>`).join("");
+  const eds = data.cards.filter((c) => c.editor);
+  $("#editor-tabs").setAttribute("aria-label", t.h_editor);
+  $("#editor-tabs").innerHTML = eds.map((c, k) => `<button type="button" role="tab" id="tab-${c.id}" aria-controls="panel-${c.id}" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}">${icon(c.category)}${esc(short(c))}</button>`).join("");
+  $("#editor-panels").innerHTML = eds.map((c, k) => `<div class="panel" role="tabpanel" id="panel-${c.id}" aria-labelledby="tab-${c.id}" ${k === tab ? "" : "hidden"}>
+      <figure class="window"><div class="chrome"><i></i><i></i><i></i><span>${t.editor_win}</span></div>
+        <button type="button" data-zoom="img/${c.id}-editor.png" data-cap="${esc(short(c))} — ${t.editor_win}" aria-label="${t.zoom} ${esc(short(c))} (${t.editor_win})"><img src="img/${c.id}-editor.png" alt="${t.editor_win} ${esc(short(c))}" loading="lazy"></button>
+        <figcaption>${t.editor_cap(esc(short(c)))}</figcaption></figure>
+      <figure class="window"><div class="chrome"><i></i><i></i><i></i><span>${t.card_win}</span></div>
+        <button type="button" data-zoom="img/${c.id}.png" data-cap="${esc(short(c))}" aria-label="${t.zoom} ${esc(short(c))}"><img src="img/${c.id}.png" alt="${esc(short(c))}" loading="lazy"></button></figure>
+    </div>`).join("");
+
+  $("#reqs").innerHTML = ["core", "hacs"].map((k) => `<div class="req-col"><header><span class="kind ${k}">${t[k + "_s"]}</span><div><h3>${t[k + "_h"]}</h3><p>${t[k + "_p"]}</p></div></header><ul>
+    ${Object.entries(data.integrations).filter(([, i]) => i.kind === k).map(([id, i]) => {
+      const cs = data.cards.filter((c) => c.integration === id);
+      return `<li><div class="req-name"><a href="${i.url}">${esc(i.name)}${icon("ext")}</a><span class="n">${t.n_cards(cs.length)}</span></div>
+        <div class="req-cards">${cs.map((c) => `<a href="#card-${c.id}">${esc(short(c))}</a>`).join("")}</div></li>`;
+    }).join("")}</ul></div>`).join("");
 }
+
+function applyFilter(announce = true) {
+  let n = 0;
+  document.querySelectorAll(".tile").forEach((el) => { el.hidden = filter !== "all" && el.dataset.cat !== filter; if (!el.hidden) n++; });
+  document.querySelectorAll("[data-filter]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.filter === filter));
+  if (announce) $("#filter-status").textContent = I18N[lang].shown(n);
+}
+
+function selectTab(k, focus) {
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  tab = (k + tabs.length) % tabs.length;
+  tabs.forEach((b, j) => { b.setAttribute("aria-selected", j === tab); b.tabIndex = j === tab ? 0 : -1; });
+  document.querySelectorAll('[role="tabpanel"]').forEach((p, j) => (p.hidden = j !== tab));
+  if (focus) tabs[tab].focus();
+}
+
+function revealCard(hash) {
+  const el = hash.startsWith("#card-") && document.querySelector(hash);
+  if (el && el.hidden) { filter = "all"; applyFilter(); el.scrollIntoView(); }
+}
+
 function setLang(l) { lang = l; try { localStorage.setItem("lang", l); } catch {} render(); }
-fetch("cards.json").then((r) => r.json()).then((d) => {
+
+const lb = $("#lightbox");
+document.addEventListener("click", (e) => {
+  const z = e.target.closest("[data-zoom]");
+  if (z) { $("#lb-img").src = z.dataset.zoom; $("#lb-img").alt = z.dataset.cap; $("#lb-cap").textContent = z.dataset.cap; lb.showModal(); return; }
+  const f = e.target.closest("[data-filter]");
+  if (f) { filter = f.dataset.filter; applyFilter(); return; }
+  const tb = e.target.closest('[role="tab"]');
+  if (tb) { selectTab([...tb.parentNode.children].indexOf(tb)); return; }
+  const cp = e.target.closest("[data-copy]");
+  if (cp) {
+    const done = () => { cp.classList.add("ok"); cp.lastChild.textContent = I18N[lang].copied; setTimeout(() => { cp.classList.remove("ok"); cp.lastChild.textContent = I18N[lang].copy; }, 1800); };
+    navigator.clipboard?.writeText(REPO).then(done, () => getSelection().selectAllChildren($("#repo-url"))) ?? getSelection().selectAllChildren($("#repo-url"));
+    return;
+  }
+  const a = e.target.closest('a[href^="#card-"]');
+  if (a) revealCard(a.getAttribute("href"));
+});
+document.addEventListener("keydown", (e) => {
+  if (!e.target.matches('[role="tab"]')) return;
+  const d = { ArrowRight: 1, ArrowLeft: -1, Home: -tab, End: 99 }[e.key];
+  if (d === undefined) return;
+  e.preventDefault();
+  selectTab(e.key === "End" ? -1 : tab + d, true);
+});
+lb.addEventListener("click", (e) => { if (e.target === lb) lb.close(); });
+$("#lb-close").addEventListener("click", () => lb.close());
+// Missing screenshot: swap the broken image for a category placeholder instead of leaving a hole.
+document.addEventListener("error", (e) => {
+  const img = e.target;
+  if (img.tagName !== "IMG" || img.id === "lb-img") return;
+  const shot = img.closest(".shot");
+  if (!shot) { img.hidden = true; return; }
+  shot.outerHTML = `<div class="ph"><span class="badge">${icon(img.dataset.cat)}</span><span>${I18N[lang].no_shot}</span></div>`;
+}, true);
+window.addEventListener("hashchange", () => revealCard(location.hash));
+
+document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => data && setLang(b.dataset.lang)));
+fetch("cards.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
   data = d;
   let saved; try { saved = localStorage.getItem("lang"); } catch {}
   setLang(saved || ((navigator.language || "fr").startsWith("fr") ? "fr" : "en"));
+  revealCard(location.hash);
 });
-document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => data && setLang(b.dataset.lang)));

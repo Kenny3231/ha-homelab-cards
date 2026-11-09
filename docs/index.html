@@ -4,41 +4,109 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Homelab Cards for Home Assistant</title>
-<meta name="description" content="Cartes Lovelace pour homelab : UniFi, Proxmox, Synology, Transmission, DNS Technitium, Android TV. Installation HACS en un clic.">
-<link rel="stylesheet" href="style.css">
+<meta name="description" content="Cartes Lovelace pour homelab : UniFi, Proxmox, Synology, Transmission, DNS Technitium, Android TV. Éditeur visuel intégré, installation HACS en un clic.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0288d1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2303a9f4'/%3E%3Cpath d='M8 15 16 8l8 7v9H8z' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
-<header class="top"><div class="wrap">
-  <a class="brand" href="#">Homelab Cards</a>
-  <nav><a href="#install" data-i18n="nav_install"></a><a href="#cards" data-i18n="nav_cards"></a><a href="#requirements" data-i18n="nav_req"></a></nav>
-  <div class="toggle" role="group" aria-label="Language"><button data-lang="fr">FR</button><button data-lang="en">EN</button></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/><path d="M9 20v-5h6v5"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5m0 2.5v.01"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 5h5v5m0-5-8 8M17 14v5H5V7h5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5M11 8.5v5m-2.5-2.5h5"/></symbol>
+  <symbol id="i-network" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></symbol>
+  <symbol id="i-virtualization" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/></symbol>
+  <symbol id="i-storage" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+  <symbol id="i-media" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M10.5 8.5v5l4-2.5z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/><path d="M9 15c1 1.3 5 1.3 6 0"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<a class="skip" href="#main" data-i18n="skip"></a>
+<header class="top"><div class="wrap bar">
+  <a class="brand" href="#top"><span class="logo"><svg class="ic"><use href="#i-logo"/></svg></span>Homelab Cards</a>
+  <nav aria-label="Sections"><a href="#install" data-i18n="nav_install"></a><a href="#cards" data-i18n="nav_cards"></a><a href="#editor" data-i18n="nav_editor"></a><a href="#requirements" data-i18n="nav_req"></a></nav>
+  <div class="toggle" role="group" aria-label="Language / Langue"><button type="button" data-lang="fr" lang="fr">FR</button><button type="button" data-lang="en" lang="en">EN</button></div>
+  <a class="icon-btn" href="https://github.com/Kenny3231/ha-homelab-cards" aria-label="GitHub"><svg class="ic"><use href="#i-github"/></svg></a>
 </div></header>
-<main class="wrap">
-  <div class="hero">
-    <h1 data-i18n="h1"></h1>
-    <p data-i18n="lead"></p>
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/Kenny3231/ha-homelab-cards" data-i18n="cta_gh"></a>
-      <a class="btn ghost" href="#install" data-i18n="cta_install"></a>
+
+<main id="main">
+  <section class="hero" id="top"><div class="wrap hero-grid">
+    <div class="hero-copy">
+      <a class="hacs-badge" href="https://hacs.xyz/" aria-label="HACS Custom repository"><span>HACS</span><span>Custom</span></a>
+      <h1 data-i18n="h1"></h1>
+      <p class="lead" data-i18n="lead"></p>
+      <div class="cta">
+        <a class="btn primary" href="#install"><svg class="ic"><use href="#i-download"/></svg><span data-i18n="cta_install"></span></a>
+        <a class="btn ghost" href="https://github.com/Kenny3231/ha-homelab-cards"><svg class="ic"><use href="#i-github"/></svg><span data-i18n="cta_gh"></span></a>
+      </div>
+      <ul class="facts" id="facts"></ul>
     </div>
-  </div>
-  <section id="install">
-    <h2 data-i18n="h_install"></h2>
-    <ol class="steps" id="steps"></ol>
-    <p class="req" data-i18n="no_yaml"></p>
-  </section>
-  <section id="cards"><h2 data-i18n="h_cards"></h2><div id="catalog"></div></section>
-  <section id="requirements">
-    <h2 data-i18n="h_req"></h2>
-    <p data-i18n="req_lead"></p>
-    <div class="tablewrap"><table><thead><tr><th data-i18n="th_integ"></th><th data-i18n="th_kind"></th><th data-i18n="th_cards"></th></tr></thead><tbody id="reqs"></tbody></table></div>
-  </section>
-  <section>
-    <h2 data-i18n="h_soon"></h2>
-    <p data-i18n="soon"></p>
-  </section>
+    <div class="mosaic" aria-hidden="true">
+      <div class="col"><img src="img/unifi-gateway.png" alt=""><img src="img/remote.png" alt=""></div>
+      <div class="col"><img src="img/proxmox-node.png" alt=""><img src="img/dns.png" alt=""><img src="img/synology-volumes.png" alt=""></div>
+    </div>
+  </div></section>
+
+  <section id="install" class="band"><div class="wrap">
+    <div class="head"><h2 data-i18n="h_install"></h2><p data-i18n="install_lead"></p></div>
+    <div class="install-grid">
+      <ol class="steps" id="steps"></ol>
+      <aside class="aside-card">
+        <h3 data-i18n="quick_h"></h3>
+        <p data-i18n="quick_p"></p>
+        <a class="btn primary block" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=Kenny3231&amp;repository=ha-homelab-cards&amp;category=plugin"><svg class="ic"><use href="#i-ext"/></svg><span data-i18n="quick_btn"></span></a>
+        <p class="small" data-i18n="no_yaml"></p>
+      </aside>
+    </div>
+  </div></section>
+
+  <section id="cards"><div class="wrap">
+    <div class="head"><h2 data-i18n="h_cards"></h2><p data-i18n="cards_lead"></p></div>
+    <div class="filters" role="group" id="filters"></div>
+    <p class="sr-only" aria-live="polite" id="filter-status"></p>
+    <div class="grid" id="catalog"></div>
+  </div></section>
+
+  <section id="editor" class="band"><div class="wrap">
+    <div class="head"><h2 data-i18n="h_editor"></h2><p data-i18n="editor_lead"></p></div>
+    <ul class="perks" id="perks"></ul>
+    <div class="tabs" role="tablist" id="editor-tabs"></div>
+    <div id="editor-panels"></div>
+  </div></section>
+
+  <section id="requirements"><div class="wrap">
+    <div class="head"><h2 data-i18n="h_req"></h2><p data-i18n="req_lead"></p></div>
+    <div class="req-grid" id="reqs"></div>
+  </div></section>
+
+  <section id="soon" class="band"><div class="wrap">
+    <div class="head"><h2 data-i18n="h_soon"></h2><p data-i18n="soon"></p></div>
+    <div class="soon-grid">
+      <div class="soon-item"><span class="soon-ic"><svg class="ic"><use href="#i-box"/></svg></span><div><h3>Portainer</h3><p data-i18n="soon_portainer"></p></div></div>
+      <a class="soon-item idea" href="https://github.com/Kenny3231/ha-homelab-cards/issues"><span class="soon-ic"><svg class="ic"><use href="#i-plus"/></svg></span><div><h3 data-i18n="idea_h"></h3><p data-i18n="idea_p"></p></div></a>
+    </div>
+  </div></section>
 </main>
-<footer><div class="wrap"><span data-i18n="foot"></span> · MIT · <a href="https://github.com/Kenny3231/ha-homelab-cards">GitHub</a></div></footer>
-<script src="app.js"></script>
+
+<footer><div class="wrap foot">
+  <a class="brand" href="#top"><span class="logo"><svg class="ic"><use href="#i-logo"/></svg></span>Homelab Cards</a>
+  <p><span data-i18n="foot"></span> · <span data-i18n="foot_aff"></span></p>
+  <p>MIT · <a href="https://github.com/Kenny3231/ha-homelab-cards">GitHub</a></p>
+</div></footer>
+
+<dialog class="lightbox" id="lightbox" aria-labelledby="lb-cap">
+  <button type="button" class="icon-btn lb-close" id="lb-close"><svg class="ic"><use href="#i-close"/></svg></button>
+  <figure><img id="lb-img" alt=""><figcaption id="lb-cap"></figcaption></figure>
+</dialog>
+<script src="app.js?v=3"></script>
 </body>
 </html>

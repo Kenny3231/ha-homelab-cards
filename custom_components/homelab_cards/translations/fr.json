@@ -3,9 +3,38 @@
     "step": {
       "user": {
         "title": "Homelab Cards",
-        "description": "Choisissez les cartes à charger sur vos tableaux de bord. Aucune ressource à déclarer à la main.",
-        "data": {
-          "cards": "Cartes"
+        "description": "Choisissez les cartes à charger sur vos tableaux de bord, regroupées par catégorie. Aucune ressource à déclarer à la main.",
+        "sections": {
+          "network": {
+            "name": "Réseau",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "virtualization": {
+            "name": "Virtualisation",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "storage": {
+            "name": "Stockage",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "media": {
+            "name": "Média & téléchargements",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "home": {
+            "name": "Maison",
+            "data": {
+              "cards": "Cartes"
+            }
+          }
         }
       }
     },
@@ -18,8 +47,37 @@
       "init": {
         "title": "Homelab Cards",
         "description": "Choisissez les cartes à charger. Rechargez la page du navigateur après l'enregistrement.",
-        "data": {
-          "cards": "Cartes"
+        "sections": {
+          "network": {
+            "name": "Réseau",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "virtualization": {
+            "name": "Virtualisation",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "storage": {
+            "name": "Stockage",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "media": {
+            "name": "Média & téléchargements",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "home": {
+            "name": "Maison",
+            "data": {
+              "cards": "Cartes"
+            }
+          }
         }
       }
     }

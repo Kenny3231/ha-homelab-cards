@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_integration
 
-from .const import CARDS_DIR, CONF_CARDS, DOMAIN, URL_BASE, available_cards
+from .const import CARDS_DIR, CONF_CARDS, DOMAIN, URL_BASE, load_catalog
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -17,10 +17,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[f"{DOMAIN}_static"] = True
 
     version = (await async_get_integration(hass, DOMAIN)).version
-    catalog = available_cards()
-    # Default (no options saved yet): every card.
-    selected = entry.options.get(CONF_CARDS, list(catalog))
-    urls = [f"{URL_BASE}/{catalog[c]}?v={version}" for c in selected if c in catalog]
+    cards = load_catalog()["cards"]
+    # Selection holds card ids; v2.0 stored "category/file-stem", still accepted. No selection saved: every card.
+    selected = set(entry.options.get(CONF_CARDS, [c["id"] for c in cards]))
+    urls = [
+        f"{URL_BASE}/{c['file']}?v={version}"
+        for c in cards
+        if c["id"] in selected or c["file"].removesuffix(".js") in selected
+    ]
     for url in urls:
         add_extra_js_url(hass, url)
     entry.runtime_data = urls

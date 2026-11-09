@@ -1,6 +1,8 @@
-// Génère README.md (EN) et README.fr.md (FR) depuis docs/cards.json — source unique avec le site.
-import { readFileSync, writeFileSync } from "node:fs";
-const { categories, integrations, cards } = JSON.parse(readFileSync("docs/cards.json", "utf8"));
+// Génère README.md (EN) et README.fr.md (FR) depuis custom_components/homelab_cards/cards.json — source unique avec le site.
+import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
+const CATALOG = "custom_components/homelab_cards/cards.json"; // source unique : intégration + site + README
+const { categories, integrations, cards } = JSON.parse(readFileSync(CATALOG, "utf8"));
+copyFileSync(CATALOG, "docs/cards.json"); // le site (GitHub Pages) ne sert que docs/
 const REPO = "Kenny3231/ha-homelab-cards";
 const T = {
   en: {

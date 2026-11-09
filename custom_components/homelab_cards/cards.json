@@ -1,0 +1,344 @@
+{
+ "categories": {
+  "network": {
+   "fr": "Réseau",
+   "en": "Network"
+  },
+  "virtualization": {
+   "fr": "Virtualisation",
+   "en": "Virtualization"
+  },
+  "storage": {
+   "fr": "Stockage",
+   "en": "Storage"
+  },
+  "media": {
+   "fr": "Média & téléchargements",
+   "en": "Media & downloads"
+  },
+  "home": {
+   "fr": "Maison",
+   "en": "Home"
+  }
+ },
+ "integrations": {
+  "unifi": {
+   "name": "UniFi Network",
+   "url": "https://www.home-assistant.io/integrations/unifi/",
+   "kind": "core"
+  },
+  "proxmoxve": {
+   "name": "Proxmox VE",
+   "url": "https://github.com/dougiteixeira/proxmoxve",
+   "kind": "hacs"
+  },
+  "synology_dsm": {
+   "name": "Synology DSM",
+   "url": "https://www.home-assistant.io/integrations/synology_dsm/",
+   "kind": "core"
+  },
+  "transmission": {
+   "name": "Transmission",
+   "url": "https://www.home-assistant.io/integrations/transmission/",
+   "kind": "core"
+  },
+  "technitium": {
+   "name": "Technitium DNS",
+   "url": "https://github.com/Amateur-God/home-assistant-technitiumdns",
+   "kind": "hacs"
+  },
+  "androidtv": {
+   "name": "Android TV Remote",
+   "url": "https://www.home-assistant.io/integrations/androidtv_remote/",
+   "kind": "core"
+  },
+  "intex": {
+   "name": "Intex Spa",
+   "url": "https://github.com/mathieu-mp/homeassistant-intex-spa",
+   "kind": "hacs"
+  }
+ },
+ "cards": [
+  {
+   "id": "unifi-gateway",
+   "editor": true,
+   "category": "network",
+   "type": "custom:unifi-gateway-card",
+   "file": "network/unifi-gateway-card.js",
+   "integration": "unifi",
+   "desc": {
+    "fr": "Passerelle UniFi (UCG / UDM / USG) : état, clients, uptime, latences WAN, ports et mises à jour.",
+    "en": "UniFi gateway (UCG / UDM / USG): status, clients, uptime, WAN latency, ports and updates."
+   },
+   "name": {
+    "en": "UniFi Gateway",
+    "fr": "UniFi – Passerelle"
+   }
+  },
+  {
+   "id": "unifi-switch",
+   "category": "network",
+   "type": "custom:unifi-switch-card",
+   "file": "network/unifi-switch-card.js",
+   "integration": "unifi",
+   "desc": {
+    "fr": "Switch UniFi : grille de ports avec vitesse de lien et état.",
+    "en": "UniFi switch: port grid with link speed and status."
+   },
+   "name": {
+    "en": "UniFi Switch",
+    "fr": "UniFi – Switch"
+   }
+  },
+  {
+   "id": "unifi-ap",
+   "category": "network",
+   "type": "custom:unifi-ap-card",
+   "file": "network/unifi-ap-card.js",
+   "integration": "unifi",
+   "desc": {
+    "fr": "Bornes WiFi UniFi : plusieurs AP dans une seule carte.",
+    "en": "UniFi access points: several APs in one card."
+   },
+   "name": {
+    "en": "UniFi Access Points",
+    "fr": "UniFi – Bornes WiFi"
+   }
+  },
+  {
+   "id": "unifi-clients",
+   "category": "network",
+   "type": "custom:unifi-clients-card",
+   "file": "network/unifi-clients-card.js",
+   "integration": "unifi",
+   "desc": {
+    "fr": "Équipements connectés : liste manuelle ou découverte automatique filtrable par plage IP.",
+    "en": "Connected devices: manual list or auto-discovery filterable by IP range."
+   },
+   "note": {
+    "fr": "Le filtre par plage IP exige que vos device_tracker exposent un attribut IP (réglable via auto.ip_attribute).",
+    "en": "The IP range filter requires your device_tracker entities to expose an IP attribute (configurable via auto.ip_attribute)."
+   },
+   "name": {
+    "en": "UniFi Clients",
+    "fr": "UniFi – Équipements connectés"
+   }
+  },
+  {
+   "id": "unifi-wifi",
+   "editor": true,
+   "category": "network",
+   "type": "custom:unifi-wifi-card",
+   "file": "network/unifi-wifi-card.js",
+   "integration": "unifi",
+   "desc": {
+    "fr": "Active / désactive chaque réseau WiFi (SSID) et affiche le nombre de clients.",
+    "en": "Enable / disable each WiFi network (SSID) and show connected clients."
+   },
+   "note": {
+    "fr": "Les switches de réseau WiFi ne sont créés par l'intégration UniFi que si l'option correspondante est activée.",
+    "en": "WiFi network switches are only created by the UniFi integration when the matching option is enabled."
+   },
+   "name": {
+    "en": "UniFi WiFi networks",
+    "fr": "UniFi – Réseaux WiFi"
+   }
+  },
+  {
+   "id": "dns",
+   "editor": true,
+   "category": "network",
+   "type": "custom:dns-status-card",
+   "file": "network/dns-card.js",
+   "integration": "technitium",
+   "desc": {
+    "fr": "Statut DNS Technitium : requêtes, blocage de pubs (pause temporisée) et historique en sparkline.",
+    "en": "Technitium DNS status: queries, ad blocking (timed pause) and history sparkline."
+   },
+   "name": {
+    "en": "Technitium DNS",
+    "fr": "Technitium DNS"
+   }
+  },
+  {
+   "id": "proxmox-node",
+   "editor": true,
+   "category": "virtualization",
+   "type": "custom:proxmox-node-card",
+   "file": "virtualization/proxmox-node-card.js",
+   "integration": "proxmoxve",
+   "desc": {
+    "fr": "Nœud PVE : CPU, mémoire, disque, swap et actions (tout démarrer/arrêter, redémarrer, éteindre).",
+    "en": "PVE node: CPU, memory, disk, swap and actions (start/stop all, reboot, shutdown)."
+   },
+   "name": {
+    "en": "Proxmox – Node",
+    "fr": "Proxmox – Nœud"
+   }
+  },
+  {
+   "id": "proxmox-guests",
+   "category": "virtualization",
+   "type": "custom:proxmox-guests-card",
+   "file": "virtualization/proxmox-guests-card.js",
+   "integration": "proxmoxve",
+   "desc": {
+    "fr": "VM (QEMU) et conteneurs (LXC) avec boutons contextuels démarrer / éteindre / forcer / redémarrer.",
+    "en": "VMs (QEMU) and containers (LXC) with contextual start / shutdown / force stop / reboot buttons."
+   },
+   "name": {
+    "en": "Proxmox – VMs & containers",
+    "fr": "Proxmox – VM et conteneurs"
+   }
+  },
+  {
+   "id": "proxmox-storage",
+   "category": "virtualization",
+   "type": "custom:proxmox-storage-card",
+   "file": "virtualization/proxmox-storage-card.js",
+   "integration": "proxmoxve",
+   "desc": {
+    "fr": "Volumes de stockage Proxmox : occupation et état.",
+    "en": "Proxmox storage volumes: usage and status."
+   },
+   "name": {
+    "en": "Proxmox – Storage",
+    "fr": "Proxmox – Stockage"
+   }
+  },
+  {
+   "id": "proxmox-disks",
+   "category": "virtualization",
+   "type": "custom:proxmox-disks-card",
+   "file": "virtualization/proxmox-disks-card.js",
+   "integration": "proxmoxve",
+   "desc": {
+    "fr": "Disques physiques : santé S.M.A.R.T., température et usure SSD.",
+    "en": "Physical disks: S.M.A.R.T. health, temperature and SSD wear."
+   },
+   "note": {
+    "fr": "L'usure SSD est ambiguë selon le firmware : réglez wearout_mode par disque (used = usure, remaining = vie restante).",
+    "en": "SSD wearout is ambiguous depending on firmware: set wearout_mode per disk (used = wear, remaining = life left)."
+   },
+   "name": {
+    "en": "Proxmox – Disks",
+    "fr": "Proxmox – Disques"
+   }
+  },
+  {
+   "id": "synology-nas",
+   "editor": true,
+   "category": "storage",
+   "type": "custom:synology-nas-card",
+   "file": "storage/synology-nas-card.js",
+   "integration": "synology_dsm",
+   "desc": {
+    "fr": "Système DSM : CPU, mémoire, charge, débits, mise à jour et actions (redémarrer / éteindre).",
+    "en": "DSM system: CPU, memory, load, throughput, update and actions (reboot / shutdown)."
+   },
+   "name": {
+    "en": "Synology – NAS",
+    "fr": "Synology – NAS"
+   }
+  },
+  {
+   "id": "synology-volumes",
+   "category": "storage",
+   "type": "custom:synology-volumes-card",
+   "file": "storage/synology-volumes-card.js",
+   "integration": "synology_dsm",
+   "desc": {
+    "fr": "Volumes DSM : espace utilisé et état.",
+    "en": "DSM volumes: used space and status."
+   },
+   "name": {
+    "en": "Synology – Volumes",
+    "fr": "Synology – Volumes"
+   }
+  },
+  {
+   "id": "synology-drives",
+   "category": "storage",
+   "type": "custom:synology-drives-card",
+   "file": "storage/synology-drives-card.js",
+   "integration": "synology_dsm",
+   "desc": {
+    "fr": "Disques DSM : état, température et alarmes S.M.A.R.T. (secteurs défectueux, durée de vie).",
+    "en": "DSM drives: status, temperature and S.M.A.R.T. alarms (bad sectors, remaining life)."
+   },
+   "name": {
+    "en": "Synology – Drives",
+    "fr": "Synology – Disques"
+   }
+  },
+  {
+   "id": "transmission",
+   "category": "media",
+   "type": "custom:transmission-status-card",
+   "file": "media/transmission-card.js",
+   "integration": "transmission",
+   "desc": {
+    "fr": "Client Transmission : débits, torrents actifs, mode tortue, liste détaillée des torrents.",
+    "en": "Transmission client: speeds, active torrents, turtle mode, detailed torrent list."
+   },
+   "note": {
+    "fr": "Lit l'attribut torrent_info des capteurs *_torrents. power_entity est requis.",
+    "en": "Reads the torrent_info attribute of the *_torrents sensors. power_entity is required."
+   },
+   "name": {
+    "en": "Transmission",
+    "fr": "Transmission"
+   }
+  },
+  {
+   "id": "remote",
+   "editor": true,
+   "category": "media",
+   "type": "custom:perso-remote-card",
+   "file": "media/perso-remote-card.js",
+   "integration": "androidtv",
+   "desc": {
+    "fr": "Télécommande « physique » : D-pad circulaire, touches en relief, volume via un media_player.",
+    "en": "“Physical” remote: circular D-pad, embossed keys, volume through a media_player."
+   },
+   "name": {
+    "en": "Android TV – Remote",
+    "fr": "Android TV – Télécommande"
+   }
+  },
+  {
+   "id": "apps",
+   "category": "media",
+   "type": "custom:perso-apps-card",
+   "file": "media/perso-apps-card.js",
+   "integration": "androidtv",
+   "desc": {
+    "fr": "Grille de lancement d'applications pour une entité remote (Android TV / Shield).",
+    "en": "App launcher grid for a remote entity (Android TV / Shield)."
+   },
+   "note": {
+    "fr": "Les logos sont à déposer dans /config/www/apps/ (ex. netflix.webp) ; ils ne sont pas fournis.",
+    "en": "Put your logos in /config/www/apps/ (e.g. netflix.webp); they are not bundled."
+   },
+   "name": {
+    "en": "Android TV – App launcher",
+    "fr": "Android TV – Lanceur d'applications"
+   }
+  },
+  {
+   "id": "intex-spa",
+   "category": "home",
+   "type": "custom:intex-spa-card",
+   "file": "home/intex-spa-card.js",
+   "integration": "intex",
+   "desc": {
+    "fr": "Spa Intex : température, chauffage, filtration, bulles, jets, animations bulles et vapeur.",
+    "en": "Intex spa: temperature, heating, filtration, bubbles, jets, bubble and steam animations."
+   },
+   "name": {
+    "en": "Intex Spa",
+    "fr": "Spa Intex"
+   }
+  }
+ ]
+}

@@ -8,9 +8,12 @@ const files = readdirSync(root).sort().flatMap((cat) =>
   readdirSync(join(root, cat)).filter((f) => f.endsWith(".js")).sort().map((f) => join(root, cat, f)));
 
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
-const out = [`/*! ha-homelab-cards v${version} — https://github.com/Kenny3231/ha-homelab-cards — MIT */`];
+const out = [`/*! ha-homelab-cards v${version} — https://github.com/Kenny3231/ha-homelab-cards — MIT */`,
+  // Ignore les doublons (ancienne ressource encore chargée) au lieu de faire planter tout le bundle.
+  "const __define = customElements.define.bind(customElements);\ncustomElements.define = (n, c, o) => { if (!customElements.get(n)) __define(n, c, o); };"];
 for (const f of files) out.push(`\n/* ---- ${f.replaceAll("\\", "/")} ---- */\n{\n${readFileSync(f, "utf8")}\n}`);
 
+out.push("\ncustomElements.define = __define;");
 mkdirSync("dist", { recursive: true });
 writeFileSync("dist/ha-homelab-cards.js", out.join("\n"));
 console.log(`${files.length} cartes -> dist/ha-homelab-cards.js (${Math.round(statSync("dist/ha-homelab-cards.js").size / 1024)} Ko)`);

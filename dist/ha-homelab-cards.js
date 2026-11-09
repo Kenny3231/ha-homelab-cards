@@ -1,4 +1,6 @@
-/*! ha-homelab-cards v1.0.0 — https://github.com/Kenny3231/ha-homelab-cards — MIT */
+/*! ha-homelab-cards v1.0.1 — https://github.com/Kenny3231/ha-homelab-cards — MIT */
+const __define = customElements.define.bind(customElements);
+customElements.define = (n, c, o) => { if (!customElements.get(n)) __define(n, c, o); };
 
 /* ---- src/cards/home/intex-spa-card.js ---- */
 {
@@ -11846,3 +11848,5 @@ storages:
 ============================================================ */
 
 }
+
+customElements.define = __define;

@@ -4,6 +4,8 @@
 
 Lovelace cards for Home Assistant homelabs: UniFi, Proxmox, Synology, Transmission, Technitium DNS, Android TV and more. Zero dependency, visual editor included, one HACS install, pick the cards you want.
 
+<p align="center"><img src="docs/img/unifi-gateway.png" width="240" alt="UniFi Gateway"> <img src="docs/img/unifi-switch.png" width="240" alt="UniFi Switch"> <img src="docs/img/unifi-ap.png" width="240" alt="UniFi Access Points"> <img src="docs/img/unifi-wifi.png" width="240" alt="UniFi WiFi networks"> <img src="docs/img/dns.png" width="240" alt="Technitium DNS"> <img src="docs/img/proxmox-node.png" width="240" alt="Proxmox – Node"></p>
+
 ## Installation (HACS)
 
 1. In HACS, open the menu (⋮) → **Custom repositories**.
@@ -11,6 +13,10 @@ Lovelace cards for Home Assistant homelabs: UniFi, Proxmox, Synology, Transmissi
 3. Search for **Homelab Cards**, click **Download**, then **restart Home Assistant**.
 4. Settings → Devices & services → **Add integration** → **Homelab Cards**, tick the cards you want.
 5. Reload your browser (Ctrl+Shift+R). Edit a dashboard → **Add card** → search the card name (e.g. “UniFi Gateway”).
+
+The setup screen groups the cards by category (Network, Virtualization, Storage, Media, Home) with readable names. Everything is ticked by default; change the selection later in *Settings → Devices & services → Homelab Cards → Configure*, then reload the browser.
+
+<p align="center"><img src="docs/img/config-flow.png" width="380" alt="Homelab Cards"></p>
 
 **No resource to declare**: the integration loads the cards by itself, including with YAML-mode dashboards. Change the selection later in the integration options.
 

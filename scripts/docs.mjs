@@ -1,5 +1,5 @@
 // Génère README.md (EN) et README.fr.md (FR) depuis custom_components/homelab_cards/cards.json — source unique avec le site.
-import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs";
 const CATALOG = "custom_components/homelab_cards/cards.json"; // source unique : intégration + site + README
 const { categories, integrations, cards } = JSON.parse(readFileSync(CATALOG, "utf8"));
 copyFileSync(CATALOG, "docs/cards.json"); // le site (GitHub Pages) ne sert que docs/
@@ -16,6 +16,7 @@ const T = {
       `Settings → Devices & services → **Add integration** → **Homelab Cards**, tick the cards you want.`,
       `Reload your browser (Ctrl+Shift+R). Edit a dashboard → **Add card** → search the card name (e.g. “UniFi Gateway”).`,
     ],
+    pick: "The setup screen groups the cards by category (Network, Virtualization, Storage, Media, Home) with readable names. Everything is ticked by default; change the selection later in *Settings → Devices & services → Homelab Cards → Configure*, then reload the browser.",
     yaml: "**No resource to declare**: the integration loads the cards by itself, including with YAML-mode dashboards. Change the selection later in the integration options.",
     manual: "Manual install: copy `custom_components/homelab_cards` to `/config/custom_components/` and restart.",
     cards: "Cards", integ: "Required integrations", needs: "Requires", core: "built-in", hacs: "HACS custom integration",
@@ -34,6 +35,7 @@ const T = {
       `Paramètres → Appareils et services → **Ajouter une intégration** → **Homelab Cards**, cochez les cartes voulues.`,
       `Rechargez le navigateur (Ctrl+Shift+R). Modifiez un tableau de bord → **Ajouter une carte** → cherchez le nom de la carte (ex. « UniFi Gateway »).`,
     ],
+    pick: "L'écran de configuration regroupe les cartes par catégorie (Réseau, Virtualisation, Stockage, Média, Maison) avec des noms lisibles. Tout est coché par défaut ; changez la sélection plus tard dans *Paramètres → Appareils et services → Homelab Cards → Configurer*, puis rechargez le navigateur.",
     yaml: "**Aucune ressource à déclarer** : l'intégration charge les cartes toute seule, même avec des tableaux de bord en mode YAML. Modifiez la sélection plus tard dans les options de l'intégration.",
     manual: "Installation manuelle : copiez `custom_components/homelab_cards` dans `/config/custom_components/` puis redémarrez.",
     cards: "Cartes", integ: "Intégrations requises", needs: "Nécessite", core: "native", hacs: "intégration personnalisée HACS",
@@ -45,7 +47,14 @@ const T = {
 for (const l of ["en", "fr"]) {
   const t = T[l]; const L = [];
   L.push(`# Homelab Cards for Home Assistant\n\n[${t.other[0]}](${t.other[1]}) · [${t.site}](https://kenny3231.github.io/ha-homelab-cards/) · [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)\n\n${t.tag}\n`);
-  L.push(`## ${t.install}\n\n${t.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\n${t.yaml}
+  const shots = cards.filter((c) => existsSync(`docs/img/${c.id}.png`));
+  L.push(`<p align="center">${shots.slice(0, 6).map((c) => `<img src="docs/img/${c.id}.png" width="240" alt="${c.name[l]}">`).join(" ")}</p>
+`);
+  L.push(`## ${t.install}\n\n${t.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\n${t.pick}
+
+<p align=\"center\"><img src=\"docs/img/config-flow.png\" width=\"380\" alt=\"Homelab Cards\"></p>
+
+${t.yaml}
 
 ${t.manual}\n`);
   L.push(`## ${t.integ}\n\n| | |\n|---|---|\n${Object.values(integrations).map((i) => `| [${i.name}](${i.url}) | ${t[i.kind]} |`).join("\n")}\n\n${t.legend}\n`);

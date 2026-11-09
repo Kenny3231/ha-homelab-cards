@@ -4,6 +4,8 @@
 
 Cartes Lovelace pour homelab Home Assistant : UniFi, Proxmox, Synology, Transmission, Technitium DNS, Android TV et plus. Zéro dépendance, éditeur visuel inclus, une seule installation HACS, vous choisissez les cartes.
 
+<p align="center"><img src="docs/img/unifi-gateway.png" width="240" alt="UniFi – Passerelle"> <img src="docs/img/unifi-switch.png" width="240" alt="UniFi – Switch"> <img src="docs/img/unifi-ap.png" width="240" alt="UniFi – Bornes WiFi"> <img src="docs/img/unifi-wifi.png" width="240" alt="UniFi – Réseaux WiFi"> <img src="docs/img/dns.png" width="240" alt="Technitium DNS"> <img src="docs/img/proxmox-node.png" width="240" alt="Proxmox – Nœud"></p>
+
 ## Installation (HACS)
 
 1. Dans HACS, ouvrez le menu (⋮) → **Dépôts personnalisés**.
@@ -11,6 +13,10 @@ Cartes Lovelace pour homelab Home Assistant : UniFi, Proxmox, Synology, Transmis
 3. Cherchez **Homelab Cards**, cliquez sur **Télécharger**, puis **redémarrez Home Assistant**.
 4. Paramètres → Appareils et services → **Ajouter une intégration** → **Homelab Cards**, cochez les cartes voulues.
 5. Rechargez le navigateur (Ctrl+Shift+R). Modifiez un tableau de bord → **Ajouter une carte** → cherchez le nom de la carte (ex. « UniFi Gateway »).
+
+L'écran de configuration regroupe les cartes par catégorie (Réseau, Virtualisation, Stockage, Média, Maison) avec des noms lisibles. Tout est coché par défaut ; changez la sélection plus tard dans *Paramètres → Appareils et services → Homelab Cards → Configurer*, puis rechargez le navigateur.
+
+<p align="center"><img src="docs/img/config-flow.png" width="380" alt="Homelab Cards"></p>
 
 **Aucune ressource à déclarer** : l'intégration charge les cartes toute seule, même avec des tableaux de bord en mode YAML. Modifiez la sélection plus tard dans les options de l'intégration.
 

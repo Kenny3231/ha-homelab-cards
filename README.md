@@ -33,6 +33,7 @@ Manual install: copy `custom_components/homelab_cards` to `/config/custom_compon
 | [Technitium DNS](https://github.com/Amateur-God/home-assistant-technitiumdns) | HACS custom integration |
 | [Android TV Remote](https://www.home-assistant.io/integrations/androidtv_remote/) | built-in |
 | [Intex Spa](https://github.com/mathieu-mp/homeassistant-intex-spa) | HACS custom integration |
+| [Portainer](https://www.home-assistant.io/integrations/portainer/) | built-in |
 
 “HACS” integrations must be installed first; “built-in” ones ship with Home Assistant.
 
@@ -79,6 +80,14 @@ Manual install: copy `custom_components/homelab_cards` to `/config/custom_compon
 | Card | Requires | |
 |---|---|---|
 | `custom:intex-spa-card` | [Intex Spa](https://github.com/mathieu-mp/homeassistant-intex-spa) | Intex spa: temperature, heating, filtration, bubbles, jets, bubble and steam animations. |
+
+### Containers
+
+| Card | Requires | |
+|---|---|---|
+| `custom:portainer-containers-card` | [Portainer](https://www.home-assistant.io/integrations/portainer/) | Docker containers: state, health, CPU, memory, uptime, image updates, search, filters, sorting, grouping by stack and actions (start, stop, restart, pause, kill, recreate). ⚠️ Auto-discovers every container; narrow it down by endpoint or stack in the editor. Some sensors (CPU, memory) may be disabled by default in the integration. |
+| `custom:portainer-stacks-card` | [Portainer](https://www.home-assistant.io/integrations/portainer/) | Portainer stacks: type, container count, start / stop, update (redeploy) and container summary. |
+| `custom:portainer-endpoint-card` | [Portainer](https://www.home-assistant.io/integrations/portainer/) | Docker endpoint: version, OS, architecture, CPU / memory, container counters, images, disk usage and prunes (images, volumes, build cache, networks). |
 
 ## Example
 

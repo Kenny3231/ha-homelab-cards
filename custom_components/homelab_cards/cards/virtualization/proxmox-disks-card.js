@@ -1,22 +1,76 @@
 /**
- * Proxmox Disks Card — disques physiques (santé S.M.A.R.T.)
- * Version 1.0.0
+ * Proxmox Disks Card — physical disks (S.M.A.R.T. health)
+ * Version 1.1.0
  *
- * ⚠️ Le « wearout » d'un SSD est ambigu selon le disque et le firmware :
- *    certains rapportent l'usure consommée (0 = neuf), d'autres la vie
- *    restante (100 = neuf). Règle `wearout_mode` par disque :
- *      used      → la valeur EST l'usure  (0 % = neuf)
- *      remaining → la valeur est la vie restante (100 % = neuf)
- *    En cas de doute, compare avec l'âge du disque : un disque récent
- *    affichant 95 % d'usure est presque sûrement en mode "remaining".
+ * ⚠️ An SSD "wearout" is ambiguous depending on the disk and firmware:
+ *    some report the consumed wear (0 = new), others the remaining life
+ *    (100 = new). Set `wearout_mode` per disk:
+ *      used      → the value IS the wear  (0 % = new)
+ *      remaining → the value is the remaining life (100 % = new)
+ *    When in doubt, compare with the disk's age: a recent disk showing
+ *    95 % wear is almost certainly in "remaining" mode.
  *
- * Installation :
- *  1. config/www/perso/proxmox-disks-card.js
- *  2. Resources → /local/perso/proxmox-disks-card.js?v=1 → JavaScript Module
- *  3. Ctrl+Shift+R
+ * Loaded automatically by the Homelab Cards integration.
+ * With an empty `disks` list, disks are detected from the Proxmox VE (HACS
+ * "proxmoxve") integration through the entity/device registries
+ * (platform + translation_key), never from names or UI language.
  */
 
 const PDISK_VERSION = "1.1.0";
+
+/* ---------- i18n ---------- */
+const PD_I18N = {
+  en: {
+    def_title: "Disks", healthy_1: "{0} healthy", healthy_n: "{0} healthy",
+    disk_1: "{0} disk", disk_n: "{0} disks", disk: "Disk", failing: "failing", ok: "healthy",
+    wear: "Wear", cycles: "{0} cycles",
+    y: ["year", "years"], d: ["day", "days"], d_short: "d",
+    none: "No disk found (Proxmox VE integration).",
+    /* editor */
+    title: "Title", icon: "Icon", warn_at: "Wear — warning threshold (%)",
+    critical_at: "Wear — critical threshold (%)", temp_warn: "Warning temperature (°C)",
+    temp_critical: "Critical temperature (°C)", show_wearout: "Show the wear bar",
+    node: "Node (name or device ID, auto-detection)",
+    name: "Disk name", health: "Health (S.M.A.R.T.)",
+    health_invert: "Invert health reading", wearout: "Wear",
+    wearout_mode: "Wear interpretation", temperature: "Temperature",
+    power_on_hours: "Power-on hours", power_cycles: "Power cycles", size: "Size",
+    m_used: "Consumed wear (0 % = new)", m_remaining: "Remaining life (100 % = new)",
+    s_general: "General", s_color: "Color", s_disks: "Disks",
+    c_accent: "Accent", empty: "No disk.", add: "Add a disk", disk_hash: "Disk #{0}",
+    expand_all: "Expand all", collapse_all: "Collapse all",
+    hint_disks: "The “Wear interpretation” field matters: depending on the disk, Proxmox reports either the consumed wear or the remaining life. If a recent disk shows huge wear, switch to “Remaining life”.<br>If a healthy disk is marked failing, tick “Invert health reading”.<br>Leave the list empty to detect disks automatically.",
+    desc: "Physical disks: S.M.A.R.T. health, wear, temperature.",
+  },
+  fr: {
+    def_title: "Disques", healthy_1: "{0} sain", healthy_n: "{0} sains",
+    disk_1: "{0} disque", disk_n: "{0} disques", disk: "Disque", failing: "défaillant", ok: "sain",
+    wear: "Usure", cycles: "{0} cycles",
+    y: ["an", "ans"], d: ["jour", "jours"], d_short: "j",
+    none: "Aucun disque détecté (intégration Proxmox VE).",
+    title: "Titre", icon: "Icône", warn_at: "Usure — seuil d'alerte (%)",
+    critical_at: "Usure — seuil critique (%)", temp_warn: "Température d'alerte (°C)",
+    temp_critical: "Température critique (°C)", show_wearout: "Afficher la barre d'usure",
+    node: "Nœud (nom ou ID d'appareil, détection auto)",
+    name: "Nom du disque", health: "Santé (S.M.A.R.T.)",
+    health_invert: "Inverser la lecture de la santé", wearout: "Usure",
+    wearout_mode: "Interprétation de l'usure", temperature: "Température",
+    power_on_hours: "Heures de fonctionnement", power_cycles: "Cycles d'alimentation", size: "Taille",
+    m_used: "Usure consommée (0 % = neuf)", m_remaining: "Vie restante (100 % = neuf)",
+    s_general: "Général", s_color: "Couleur", s_disks: "Disques",
+    c_accent: "Accent", empty: "Aucun disque.", add: "Ajouter un disque", disk_hash: "Disque #{0}",
+    expand_all: "Tout déplier", collapse_all: "Tout replier",
+    hint_disks: "Le champ « Interprétation de l'usure » compte : selon le disque, Proxmox rapporte soit l'usure consommée, soit la vie restante. Si un disque récent affiche une usure énorme, bascule sur « Vie restante ».<br>Si un disque sain est marqué défaillant, coche « Inverser la lecture de la santé ».<br>Laisse la liste vide pour détecter les disques automatiquement.",
+    desc: "Disques physiques : santé S.M.A.R.T., usure, température.",
+  },
+};
+const dLoc = (h) => (h && ((h.locale && h.locale.language) || h.language)) || "en";
+const dDict = (loc) => PD_I18N[/^fr/i.test(loc) ? "fr" : "en"];
+const dT = (h, k, a) => {
+  const v = dDict(dLoc(h))[k];
+  const s = v !== undefined ? v : (PD_I18N.en[k] !== undefined ? PD_I18N.en[k] : k);
+  return a === undefined ? s : String(s).replace("{0}", a);
+};
 
 const dRgba = (c, a) => {
   if (!c || c.indexOf("var(") === 0 || c.indexOf("rgb") === 0) return c;
@@ -29,19 +83,19 @@ const dNum = (st) => {
   const n = parseFloat(st.state);
   return isNaN(n) ? NaN : n;
 };
-const dFmt = (st, d) => {
+const dFmt = (st, d, h) => {
   if (!st) return "—";
   const n = parseFloat(st.state);
-  if (isNaN(n)) return st.state;
-  return n.toLocaleString("fr-FR", { maximumFractionDigits: d === undefined ? 0 : d });
+  if (isNaN(n)) return st.state === "unavailable" || st.state === "unknown" ? "—" : st.state;
+  return n.toLocaleString(dLoc(h), { maximumFractionDigits: d === undefined ? 0 : d });
 };
 const dUnit = (st) => (st && st.attributes ? st.attributes.unit_of_measurement || "" : "");
 const dEsc = (s) => String(s).replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-/* Un binary_sensor de device_class "problem" est INVERSÉ : "on" signifie
-   qu'un problème est détecté, "off" que tout va bien. Home Assistant affiche
-   d'ailleurs "OK" pour l'état off dans ce cas. Sans cette lecture, un disque
-   sain est signalé défaillant. `invert` permet de forcer manuellement. */
+/* A binary_sensor with device_class "problem" is INVERTED: "on" means a
+   problem was detected, "off" that all is fine (Home Assistant shows "OK"
+   for off). Without this reading a healthy disk is reported failing.
+   `invert` forces it manually. */
 const dOk = (st, invert) => {
   if (!st) return null;
   const s = String(st.state).toLowerCase();
@@ -52,30 +106,76 @@ const dOk = (st, invert) => {
     : (dc === "problem" || dc === "safety");
   if (s === "on") return inverted ? false : true;
   if (s === "off") return inverted ? true : false;
-  /* Certaines intégrations renvoient directement un libellé */
+  /* Some integrations return a label directly */
   if (s === "passed" || s === "ok" || s === "healthy" || s === "good") return true;
   if (s === "failed" || s === "failing" || s === "bad" || s === "ko") return false;
   return null;
 };
 
-/* Convertit les heures de fonctionnement en durée lisible */
-function dHours(h) {
+/* Turns power-on hours into a readable duration */
+function dHours(h, hass) {
   if (isNaN(h)) return null;
+  const u = (k, n) => n + " " + dT(hass, k)[n > 1 ? 1 : 0];
   const y = Math.floor(h / 8760);
   const rest = h % 8760;
   const d = Math.floor(rest / 24);
-  if (y >= 1) return y + " an" + (y > 1 ? "s" : "") + (d ? " " + d + " j" : "");
-  if (d >= 1) return d + " jour" + (d > 1 ? "s" : "");
+  if (y >= 1) return u("y", y) + (d ? " " + d + " " + dT(hass, "d_short") : "");
+  if (d >= 1) return u("d", d);
   return Math.floor(h) + " h";
+}
+
+/* ---------- proxmoxve auto-detection ---------- */
+/* { device_id: { "<domain>.<translation_key>": entity_id } } for proxmoxve entities */
+function pdByDevice(hass) {
+  const out = {};
+  Object.values((hass && hass.entities) || {}).forEach((e) => {
+    if (!e || e.platform !== "proxmoxve" || !e.device_id || !e.translation_key) return;
+    if (!hass.states[e.entity_id]) return;
+    const m = out[e.device_id] || (out[e.device_id] = {});
+    m[e.entity_id.split(".")[0] + "." + e.translation_key] = e.entity_id;
+  });
+  return out;
+}
+/* Node device id matching `want` (device id, device name or "… <node>") */
+function pdNodeId(hass, by, want) {
+  const devs = hass.devices || {};
+  return Object.keys(by).find((id) => {
+    const e = by[id];
+    if (!(e["sensor.node_status"] || e["sensor.qemu_on"] || e["sensor.lxc_on"] || e["button.start_all"])) return false;
+    return [id, devs[id] && devs[id].name_by_user, devs[id] && devs[id].name]
+      .some((x) => x && (x === want || String(x).endsWith(" " + want)));
+  }) || null;
+}
+/* Disk devices expose disk-only sensors (disk_size, power_hours, wearout, life_left).
+   proxmoxve's "disk_wearout" is already the consumed wear; "life_left" is remaining life. */
+function pdDetect(hass, want) {
+  if (!hass) return [];
+  const by = pdByDevice(hass), devs = hass.devices || {};
+  const nodeId = want ? pdNodeId(hass, by, want) : null;
+  if (want && !nodeId) return [];
+  return Object.keys(by).map((id) => {
+    const e = by[id], d = devs[id] || {};
+    if (!(e["sensor.disk_size"] || e["sensor.power_hours"] || e["sensor.disk_wearout"] || e["sensor.life_left"])) return null;
+    if (nodeId && d.via_device_id !== nodeId) return null;
+    const wear = e["sensor.disk_wearout"] || e["sensor.life_left"];
+    return {
+      name: d.name_by_user || d.name || id,
+      health: e["binary_sensor.health"],
+      wearout: wear,
+      wearout_mode: wear && !e["sensor.disk_wearout"] ? "remaining" : "used",
+      temperature: e["sensor.temperature"] || e["sensor.temperature_air"],
+      power_on_hours: e["sensor.power_hours"],
+      power_cycles: e["sensor.power_cycles"],
+      size: e["sensor.disk_size"],
+    };
+  }).filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
 }
 
 class ProxmoxDisksCard extends HTMLElement {
   setConfig(config) {
-    if (!config.disks || !config.disks.length) {
-      throw new Error("La clé 'disks' est requise (au moins un disque).");
-    }
+    this._auto = !(config.disks && config.disks.length);
     this._config = {
-      title: config.title || "Disques",
+      title: config.title || null,
       icon: config.icon || "mdi:harddisk",
       accent: config.accent || "#7F77DD",
       color_ok: config.color_ok || "#1D9E75",
@@ -85,13 +185,19 @@ class ProxmoxDisksCard extends HTMLElement {
       temp_warn: config.temp_warn || 50,
       temp_critical: config.temp_critical || 60,
       show_wearout: config.show_wearout !== false,
-      disks: config.disks,
+      node: config.node || null,
+      disks: this._auto ? [] : config.disks,
     };
+    this._ents = undefined;
     this._built = false;
   }
 
   set hass(hass) {
     this._hass = hass;
+    if (this._auto && hass.entities !== this._ents) {
+      this._ents = hass.entities;
+      this._config.disks = pdDetect(hass, this._config.node);
+    }
     if (!this._built) { this._build(); this._built = true; }
     const sig = this._sig(hass);
     if (sig !== this._last) { this._last = sig; this._render(); }
@@ -106,10 +212,11 @@ class ProxmoxDisksCard extends HTMLElement {
     return [...new Set(ids)];
   }
   _sig(h) {
-    return this._ids().map((id) => id + ":" + (h.states[id] ? h.states[id].state : "∅")).join("|");
+    return dLoc(h) + "#" + this._config.disks.length + "#" +
+      this._ids().map((id) => id + ":" + (h.states[id] ? h.states[id].state : "∅")).join("|");
   }
 
-  /* Renvoie l'usure réelle en %, quel que soit le mode de rapport du disque */
+  /* Returns the actual wear in %, whatever the disk's reporting mode */
   _wearUsed(disk, raw) {
     if (isNaN(raw)) return NaN;
     return (disk.wearout_mode === "remaining") ? 100 - raw : raw;
@@ -167,6 +274,7 @@ class ProxmoxDisksCard extends HTMLElement {
         .badok { display:inline-flex; align-items:center; gap:3px;
           font-size:10px; font-weight:600; color:#1D9E75; flex-shrink:0; }
         .badok ha-icon { --mdc-icon-size:12px; }
+        .none { font-size:11px; color:var(--secondary-text-color); font-style:italic; padding:2px; }
         .hidden { display:none !important; }
       </style>
       <ha-card>
@@ -180,6 +288,7 @@ class ProxmoxDisksCard extends HTMLElement {
 
   _render() {
     const hass = this._hass, c = this._config, r = this.shadowRoot;
+    const t = (k, a) => dT(hass, k, a);
 
     r.querySelector("ha-card").style.borderColor = dRgba(c.accent, 0.28);
     const disc = r.querySelector(".disc");
@@ -187,7 +296,7 @@ class ProxmoxDisksCard extends HTMLElement {
     const ic = disc.querySelector("ha-icon");
     ic.setAttribute("icon", c.icon);
     ic.style.color = c.accent;
-    r.querySelector(".htitle").textContent = c.title;
+    r.querySelector(".htitle").textContent = c.title || t("def_title");
 
     let healthy = 0, known = 0;
     c.disks.forEach((d) => {
@@ -197,11 +306,18 @@ class ProxmoxDisksCard extends HTMLElement {
     });
     r.querySelector(".hsub").innerHTML = known
       ? '<b style="color:' + (healthy === known ? c.color_ok : c.color_ko) + '">' +
-        healthy + " sain" + (healthy > 1 ? "s" : "") + "</b> / " + known
-      : c.disks.length + " disque" + (c.disks.length > 1 ? "s" : "");
+        dEsc(t(healthy > 1 ? "healthy_n" : "healthy_1", healthy)) + "</b> / " + known
+      : dEsc(t(c.disks.length > 1 ? "disk_n" : "disk_1", c.disks.length));
 
     const list = r.querySelector(".list");
     list.innerHTML = "";
+
+    if (!c.disks.length) {
+      const n = document.createElement("div");
+      n.className = "none";
+      n.textContent = t("none");
+      list.appendChild(n);
+    }
 
     c.disks.forEach((d) => {
       const healthSt = d.health ? hass.states[d.health] : null;
@@ -223,19 +339,19 @@ class ProxmoxDisksCard extends HTMLElement {
         '<div class="dk-top">' +
           '<span class="dot" style="background:' +
             (ok === false ? c.color_ko : ok === true ? c.color_ok : "#4a4a48") + '"></span>' +
-          '<span class="dk-name">' + dEsc(d.name || "Disque") + "</span>" +
+          '<span class="dk-name">' + dEsc(d.name || t("disk")) + "</span>" +
           (ok === false
-            ? '<span class="badko"><ha-icon icon="mdi:alert"></ha-icon>défaillant</span>'
+            ? '<span class="badko"><ha-icon icon="mdi:alert"></ha-icon>' + dEsc(t("failing")) + "</span>"
             : ok === true
-              ? '<span class="badok"><ha-icon icon="mdi:check-circle"></ha-icon>sain</span>'
+              ? '<span class="badok"><ha-icon icon="mdi:check-circle"></ha-icon>' + dEsc(t("ok")) + "</span>"
               : "") +
-          (sizeSt ? '<span class="dk-size">' + dFmt(sizeSt, 0) + " " +
+          (sizeSt ? '<span class="dk-size">' + dEsc(dFmt(sizeSt, 0, hass)) + " " +
             dEsc(dUnit(sizeSt)) + "</span>" : "") +
         "</div>";
 
       if (c.show_wearout && !isNaN(wearUsed)) {
         html +=
-          '<div class="w-top"><span>Usure</span><span>' + wearUsed.toFixed(0) + " %</span></div>" +
+          '<div class="w-top"><span>' + dEsc(t("wear")) + "</span><span>" + wearUsed.toFixed(0) + " %</span></div>" +
           '<div class="w-t"><div class="w-f" style="width:' +
             Math.min(Math.max(wearUsed, 0), 100).toFixed(1) +
             "%;background:" + wearCol + '"></div></div>';
@@ -243,15 +359,15 @@ class ProxmoxDisksCard extends HTMLElement {
 
       const foot = [];
       if (tempSt) foot.push('<span style="color:' + this._tempColor(temp) +
-        '"><ha-icon icon="mdi:thermometer"></ha-icon> ' + dFmt(tempSt, 0) + " " +
+        '"><ha-icon icon="mdi:thermometer"></ha-icon> ' + dEsc(dFmt(tempSt, 0, hass)) + " " +
         dEsc(dUnit(tempSt) || "°C") + "</span>");
       if (pohSt) {
-        const lbl = dHours(dNum(pohSt));
+        const lbl = dHours(dNum(pohSt), hass);
         foot.push('<span><ha-icon icon="mdi:power"></ha-icon> ' +
-          (lbl || dFmt(pohSt, 0) + " h") + "</span>");
+          dEsc(lbl || dFmt(pohSt, 0, hass) + " h") + "</span>");
       }
       if (pcSt) foot.push('<span><ha-icon icon="mdi:restart"></ha-icon> ' +
-        dFmt(pcSt, 0) + " cycles</span>");
+        dEsc(t("cycles", dFmt(pcSt, 0, hass))) + "</span>");
       if (foot.length) html += '<div class="dk-foot">' + foot.join("") + "</div>";
 
       el.innerHTML = html;
@@ -268,24 +384,17 @@ class ProxmoxDisksCard extends HTMLElement {
   }
 
   getCardSize() { return 2 + this._config.disks.length * 2; }
-  static getStubConfig() {
-    return { type: "custom:proxmox-disks-card", title: "Disques", disks: [{ name: "Disque 1" }] };
+  static getStubConfig(hass) {
+    /* JSON round-trip drops the undefined keys of entities that do not exist */
+    const disks = JSON.parse(JSON.stringify(pdDetect(hass, null)));
+    return { type: "custom:proxmox-disks-card", title: dT(hass, "def_title"),
+      disks: disks.length ? disks : [{ name: dT(hass, "disk") + " 1" }] };
   }
   static getConfigElement() { return document.createElement("proxmox-disks-card-editor"); }
 }
 customElements.define("proxmox-disks-card", ProxmoxDisksCard);
 
-/* ================= ÉDITEUR ================= */
-const PD_L = {
-  title: "Titre", icon: "Icône", warn_at: "Usure — seuil d'alerte (%)",
-  critical_at: "Usure — seuil critique (%)", temp_warn: "Température d'alerte (°C)",
-  temp_critical: "Température critique (°C)", show_wearout: "Afficher la barre d'usure",
-  name: "Nom du disque", health: "Santé (S.M.A.R.T.)",
-  health_invert: "Inverser la lecture de la santé", wearout: "Usure",
-  wearout_mode: "Interprétation de l'usure", temperature: "Température",
-  power_on_hours: "Heures de fonctionnement", power_cycles: "Cycles d'alimentation",
-  size: "Taille",
-};
+/* ================= EDITOR ================= */
 const PD_S_GEN = [
   { type: "grid", schema: [
     { name: "title", selector: { text: {} } },
@@ -300,16 +409,17 @@ const PD_S_GEN = [
     { name: "temp_critical", selector: { number: { min: 20, max: 100, mode: "box" } } },
   ]},
   { name: "show_wearout", selector: { boolean: {} } },
+  { name: "node", selector: { text: {} } },
 ];
 const PD_SENSOR = { entity: { filter: { domain: ["sensor"] } } };
-const PD_S_DISK = [
+const PD_S_DISK = (t) => [
   { name: "name", selector: { text: {} } },
   { name: "health", selector: { entity: { filter: { domain: ["binary_sensor", "sensor"] } } } },
   { name: "health_invert", selector: { boolean: {} } },
   { name: "wearout", selector: PD_SENSOR },
   { name: "wearout_mode", selector: { select: { mode: "dropdown", options: [
-    { value: "used", label: "Usure consommée (0 % = neuf)" },
-    { value: "remaining", label: "Vie restante (100 % = neuf)" },
+    { value: "used", label: t("m_used") },
+    { value: "remaining", label: t("m_remaining") },
   ]}}},
   { name: "temperature", selector: PD_SENSOR },
   { name: "power_on_hours", selector: PD_SENSOR },
@@ -317,16 +427,60 @@ const PD_S_DISK = [
   { name: "size", selector: PD_SENSOR },
 ];
 
+/* ---------- Collapsible editor sections (state kept across editor re-creations) ---------- */
+const PD_SEC_STATE = new Map();
+const PD_SEC_CSS = `
+  .sec-tools { display:flex; justify-content:flex-end; margin-bottom:4px; }
+  .sec-all { background:none; border:none; padding:2px 4px; border-radius:4px; cursor:pointer;
+    font:inherit; font-size:12px; color:var(--secondary-text-color); }
+  .sec-all:hover { color:var(--primary-text-color); }
+  button.sec-head { width:100%; background:none; border:none; border-bottom:1px solid var(--divider-color);
+    padding:0 0 6px 0; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .sec-head:focus-visible, .sec-all:focus-visible { outline:2px solid var(--primary-color); outline-offset:2px; }
+  .sec-chev { --mdc-icon-size:20px; color:var(--secondary-text-color); transition:transform .2s ease; flex-shrink:0; }
+  .sec-head[aria-expanded="false"] .sec-chev { transform:rotate(-90deg); }
+  .sec-body[hidden] { display:none !important; }`;
+const pdSec = (id, title, body) =>
+  '<div class="sec"><button type="button" class="sec-head" data-sec="' + id + '" aria-expanded="false" aria-controls="sec-' + id + '">' +
+  '<ha-icon class="sec-chev" icon="mdi:chevron-down"></ha-icon><span class="sec-title">' + dEsc(title) + "</span></button>" +
+  '<div class="sec-body" id="sec-' + id + '" hidden>' + body + "</div></div>";
+/* Wires headers + "expand/collapse all"; the first section is open by default, the others closed */
+function pdWireSections(root, tag, t) {
+  const heads = Array.from(root.querySelectorAll(".sec-head"));
+  const all = root.querySelector(".sec-all");
+  const sync = () => {
+    all.textContent = t(heads.some((h) => h.getAttribute("aria-expanded") !== "true") ? "expand_all" : "collapse_all");
+  };
+  const set = (h, open) => {
+    h.setAttribute("aria-expanded", String(open));
+    root.getElementById(h.getAttribute("aria-controls")).hidden = !open;
+    PD_SEC_STATE.set(tag + ":" + h.dataset.sec, open);
+  };
+  heads.forEach((h, i) => {
+    const k = tag + ":" + h.dataset.sec;
+    set(h, PD_SEC_STATE.has(k) ? PD_SEC_STATE.get(k) : i === 0);
+    h.addEventListener("click", () => { set(h, h.getAttribute("aria-expanded") !== "true"); sync(); });
+  });
+  all.addEventListener("click", () => {
+    const open = heads.some((h) => h.getAttribute("aria-expanded") !== "true");
+    heads.forEach((h) => set(h, open)); sync();
+  });
+  sync();
+}
+
 class ProxmoxDisksCardEditor extends HTMLElement {
   setConfig(cfg) {
     this._config = JSON.parse(JSON.stringify(cfg || {}));
+    if (!this._hass) return;
     if (!this._built) { this._build(); this._built = true; }
     this._update();
   }
   set hass(h) {
-    const first = !this._hass; this._hass = h;
-    if (!this._built) return;
-    if (first) this._update(); else this._refreshHass();
+    this._hass = h;
+    if (!this._config) return;
+    /* Built once hass is known so the UI language is right from the start */
+    if (!this._built) { this._build(); this._built = true; this._update(); }
+    else this._refreshHass();
   }
   _refreshHass() { this.shadowRoot.querySelectorAll("ha-form").forEach((f) => { f.hass = this._hass; }); }
   _setColor(sel, v) {
@@ -338,9 +492,11 @@ class ProxmoxDisksCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config: this._config }, bubbles: true, composed: true }));
   }
-  _label(s) { return PD_L[s.name] || s.name; }
+  _t(k, a) { return dT(this._hass, k, a); }
+  _label(s) { return this._t(s.name); }
 
   _build() {
+    const t = (k) => dEsc(this._t(k));
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
@@ -368,32 +524,35 @@ class ProxmoxDisksCardEditor extends HTMLElement {
           color:var(--primary-text-color); user-select:none; }
         .addbtn:hover { background:var(--divider-color); }
         .empty { font-size:12px; color:var(--secondary-text-color); font-style:italic; margin-bottom:10px; }
+        ${PD_SEC_CSS}
       </style>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Général</span></div>
-        <ha-form class="f-gen"></ha-form></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Couleur</span></div>
+      <div class="sec-tools"><button type="button" class="sec-all"></button></div>
+      ${pdSec("general", this._t("s_general"), `<ha-form class="f-gen"></ha-form>`)}
+      ${pdSec("color", this._t("s_color"), `
         <div class="colors">
-          <div class="color-field"><input type="color" class="c-accent"><label>Accent</label></div>
-        </div></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Disques</span></div>
-        <div class="sec-hint">Le champ « Interprétation de l'usure » compte : selon le disque, Proxmox rapporte soit l'usure consommée, soit la vie restante. Si un disque récent affiche une usure énorme, bascule sur « Vie restante ».<br>Si un disque sain est marqué défaillant, coche « Inverser la lecture de la santé ».</div>
+          <div class="color-field"><input type="color" class="c-accent"><label>${t("c_accent")}</label></div>
+        </div>`)}
+      ${pdSec("disks", this._t("s_disks"), `
+        <div class="sec-hint">${this._t("hint_disks")}</div>
         <div class="rows-disks"></div>
-        <div class="addbtn add-disk"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter un disque</span></div></div>
+        <div class="addbtn add-disk"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add")}</span></div>`)}
     `;
     const r = this.shadowRoot;
+    pdWireSections(r, this.tagName.toLowerCase(), (k) => this._t(k));
     const f = r.querySelector(".f-gen");
-    f.schema = PD_S_GEN; f.computeLabel = this._label;
+    f.schema = PD_S_GEN; f.computeLabel = (s) => this._label(s);
     f.addEventListener("value-changed", (e) => {
       e.stopPropagation();
       Object.assign(this._config, e.detail.value);
       if (this._config.title === "") delete this._config.title;
+      if (!this._config.node) delete this._config.node;
       this._emit();
     });
     const el = r.querySelector(".c-accent");
     const apply = (v) => { this._config.accent = v; this._emit(); };
-    let t = null;
-    el.addEventListener("input", (e) => { const v = e.target.value; clearTimeout(t); t = setTimeout(() => apply(v), 200); });
-    el.addEventListener("change", (e) => { clearTimeout(t); apply(e.target.value); });
+    let tm = null;
+    el.addEventListener("input", (e) => { const v = e.target.value; clearTimeout(tm); tm = setTimeout(() => apply(v), 200); });
+    el.addEventListener("change", (e) => { clearTimeout(tm); apply(e.target.value); });
 
     r.querySelector(".add-disk").addEventListener("click", () => {
       this._config.disks = (this._config.disks || []).concat([{ name: "", wearout_mode: "used" }]);
@@ -410,7 +569,7 @@ class ProxmoxDisksCardEditor extends HTMLElement {
       title: c.title || "", icon: c.icon || "mdi:harddisk",
       warn_at: c.warn_at || 60, critical_at: c.critical_at || 85,
       temp_warn: c.temp_warn || 50, temp_critical: c.temp_critical || 60,
-      show_wearout: c.show_wearout !== false,
+      show_wearout: c.show_wearout !== false, node: c.node || "",
     };
     this._setColor(".c-accent", c.accent || "#7F77DD");
 
@@ -421,7 +580,7 @@ class ProxmoxDisksCardEditor extends HTMLElement {
       box.innerHTML = "";
       if (!list.length) {
         const e = document.createElement("div");
-        e.className = "empty"; e.textContent = "Aucun disque.";
+        e.className = "empty"; e.textContent = this._t("empty");
         box.appendChild(e);
       }
       list.forEach((it, i) => box.appendChild(this._row(it, i, list.length)));
@@ -441,7 +600,7 @@ class ProxmoxDisksCardEditor extends HTMLElement {
     head.className = "row-head";
     const num = document.createElement("span");
     num.className = "row-num";
-    num.textContent = item.name || "Disque #" + (index + 1);
+    num.textContent = item.name || this._t("disk_hash", index + 1);
     head.appendChild(num);
     const mk = (icon, cls, fn, dis) => {
       const b = document.createElement("ha-icon-button");
@@ -458,7 +617,7 @@ class ProxmoxDisksCardEditor extends HTMLElement {
     row.appendChild(head);
 
     const f = document.createElement("ha-form");
-    f.schema = PD_S_DISK; f.computeLabel = this._label; f.hass = this._hass;
+    f.schema = PD_S_DISK((k) => this._t(k)); f.computeLabel = (s) => this._label(s); f.hass = this._hass;
     f.data = Object.assign({ wearout_mode: "used", health_invert: false }, item);
     f.addEventListener("value-changed", (e) => {
       e.stopPropagation();
@@ -488,16 +647,23 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "proxmox-disks-card",
   name: "Proxmox Disks Card",
-  description: "Disques physiques : santé S.M.A.R.T., usure, température.",
+  description: dDict(document.documentElement.lang || navigator.language || "en").desc,
 });
 console.info("%c PROXMOX-DISKS-CARD %c v" + PDISK_VERSION + " ",
   "color:#fff;background:#7F77DD;font-weight:700", "color:#7F77DD;background:#222");
 
 /* ============================================================
-EXEMPLE DE CONFIG
+CONFIG EXAMPLES
+
+Minimal (auto-detection through the proxmoxve integration):
 
 type: custom:proxmox-disks-card
-title: Disques
+node: example-node        # optional, only needed with several nodes
+
+Explicit (entity IDs are placeholders, use your own):
+
+type: custom:proxmox-disks-card
+title: Disks
 icon: mdi:harddisk
 accent: "#7F77DD"
 warn_at: 60
@@ -505,12 +671,12 @@ critical_at: 85
 temp_warn: 50
 temp_critical: 60
 disks:
-  - name: Samsung SSD 840 Series
-    health: binary_sensor.disk_pve01_samsung_ssd_840_series_health
-    wearout: sensor.disk_pve01_samsung_ssd_840_series_wearout
+  - name: Example SSD
+    health: binary_sensor.disk_example_ssd_health
+    wearout: sensor.disk_example_ssd_wearout
     wearout_mode: used
-    temperature: sensor.disk_pve01_samsung_ssd_840_series_airflow_temperature
-    power_on_hours: sensor.disk_pve01_samsung_ssd_840_series_power_on_hours
-    power_cycles: sensor.disk_pve01_samsung_ssd_840_series_power_cycles
-    size: sensor.disk_pve01_samsung_ssd_840_series_size
+    temperature: sensor.disk_example_ssd_temperature
+    power_on_hours: sensor.disk_example_ssd_power_on_hours
+    power_cycles: sensor.disk_example_ssd_power_cycles
+    size: sensor.disk_example_ssd_size
 ============================================================ */

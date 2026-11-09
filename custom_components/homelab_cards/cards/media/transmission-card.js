@@ -5,7 +5,7 @@
  * Installation :
  *  1. Copier ce fichier dans  config/www/perso/transmission-card.js
  *  2. Settings → Dashboards → (menu ⋮) → Resources → Add resource
- *       URL : /local/perso/transmission-card.js?v=1
+ *       URL : /local/transmission-card.js
  *       Type : JavaScript Module
  *  3. Vider le cache navigateur (Ctrl+Shift+R)
  *
@@ -17,11 +17,168 @@
 
 const TR_CARD_VERSION = "1.0.1";
 
+/* UI strings. Language follows the HA UI language (fr* -> French, else English). */
+const TR_I18N = {
+  en: {
+    err_power: "The 'power_entity' key is required (Transmission switch).",
+    download: "Download",
+    upload: "Upload",
+    active: "Active",
+    stopped: "Stopped",
+    unavailable: "Unavailable",
+    turtle_on: "Turtle mode on",
+    turtle_off: "Turtle mode off",
+    target: "target",
+    torrents: "Torrents",
+    no_torrents: "No torrent in this state.",
+    source_unavailable: "Torrent source unavailable.",
+    more: (n) => "+ " + n + " more",
+    eta_days: (d) => d + " d left",
+    eta_hm: (h, m) => h + " h " + m + " min left",
+    eta_m: (m) => m + " min left",
+    eta_raw: (s) => s + " left",
+    card_desc: "Transmission card with torrent list, speeds and turtle mode.",
+    expand_all: "Expand all",
+    collapse_all: "Collapse all",
+    sec_general: "General",
+    sec_colors: "Colors",
+    sec_speeds: "Speeds",
+    sec_torrents: "Torrent list",
+    sec_counters: "Counters",
+    sec_ring: "Ratio ring",
+    sec_stats: "Statistics",
+    sec_actions: "Actions",
+    hint_speeds: "Current speeds with overlaid curves. Both share the same scale for a fair comparison.",
+    hint_torrents: "Reads the <code>torrent_info</code> attribute. Pick the sensor matching the torrents you want: total, active, completed…",
+    hint_counters: "Small row. The first one is also used in the header subtitle.",
+    hint_stats: "Rows to the right of the ring. Session, total, ratio…",
+    hint_actions: "Leave \"Action to run\" empty for a simple toggle/press of the entity.",
+    c_down: "Download",
+    c_up: "Upload",
+    c_idle: "Idle",
+    c_off: "Stopped",
+    add_counter: "Add a counter",
+    add_stat: "Add a stat",
+    add_action: "Add an action",
+    empty_rows: "No item. Use the button below.",
+    color: "Color",
+    sort_progress: "Progress (incomplete first)",
+    sort_name: "Name",
+    sort_ratio: "Ratio",
+    scale_auto: "Auto (detect)",
+    scale_percent: "Already in % (0-100)",
+    scale_fraction: "Fraction (0-1)",
+    labels: {
+      title: "Title",
+      power_entity: "Transmission switch (required)",
+      turtle_entity: "Turtle mode switch",
+      status_entity: "Status sensor",
+      download: "Download speed",
+      upload: "Upload speed",
+      sparkline: "Show curves",
+      hours: "History window (hours)",
+      source: "Source sensor (torrent_info attribute)",
+      label: "List title",
+      max_items: "Number of torrents shown",
+      sort: "Sort",
+      percent_scale: "Percentage scale",
+      entity: "Entity",
+      name: "Display name",
+      icon: "Icon",
+      max: "Target value (full ring)",
+      sub: "Text under the ratio",
+      actions_label: "Actions area title",
+      perform_action: "Action to run (e.g. transmission.start_torrent)",
+    },
+  },
+  fr: {
+    err_power: "La clé 'power_entity' est requise (switch Transmission).",
+    download: "Téléchargement",
+    upload: "Téléversement",
+    active: "Actif",
+    stopped: "Arrêté",
+    unavailable: "Indisponible",
+    turtle_on: "Mode tortue actif",
+    turtle_off: "Mode tortue inactif",
+    target: "cible",
+    torrents: "Torrents",
+    no_torrents: "Aucun torrent dans cet état.",
+    source_unavailable: "Source des torrents indisponible.",
+    more: (n) => "+ " + n + " autre(s)",
+    eta_days: (d) => d + " j restants",
+    eta_hm: (h, m) => h + " h " + m + " min restantes",
+    eta_m: (m) => m + " min restantes",
+    eta_raw: (s) => s + " restantes",
+    card_desc: "Carte Transmission avec liste de torrents, vitesses et mode tortue.",
+    expand_all: "Tout déplier",
+    collapse_all: "Tout replier",
+    sec_general: "Général",
+    sec_colors: "Couleurs",
+    sec_speeds: "Vitesses",
+    sec_torrents: "Liste des torrents",
+    sec_counters: "Compteurs",
+    sec_ring: "Anneau ratio",
+    sec_stats: "Statistiques",
+    sec_actions: "Actions",
+    hint_speeds: "Vitesses actuelles avec courbes superposées. Échelle commune aux deux pour comparer honnêtement.",
+    hint_torrents: "Lit l'attribut <code>torrent_info</code>. Choisis le capteur selon les torrents voulus : total, actifs, terminés…",
+    hint_counters: "Petite rangée. Le premier sert aussi au sous-titre de l'en-tête.",
+    hint_stats: "Lignes à droite de l'anneau. Session, total, ratio…",
+    hint_actions: "Laisse \"Action à exécuter\" vide pour un simple toggle/press de l'entité.",
+    c_down: "Téléchargement",
+    c_up: "Téléversement",
+    c_idle: "Inactif",
+    c_off: "Arrêté",
+    add_counter: "Ajouter un compteur",
+    add_stat: "Ajouter une stat",
+    add_action: "Ajouter une action",
+    empty_rows: "Aucun élément. Utilise le bouton ci-dessous.",
+    color: "Couleur",
+    sort_progress: "Progression (incomplets d'abord)",
+    sort_name: "Nom",
+    sort_ratio: "Ratio",
+    scale_auto: "Auto (détection)",
+    scale_percent: "Déjà en % (0-100)",
+    scale_fraction: "Fraction (0-1)",
+    labels: {
+      title: "Titre",
+      power_entity: "Switch Transmission (requis)",
+      turtle_entity: "Switch mode tortue",
+      status_entity: "Capteur de statut",
+      download: "Vitesse de téléchargement",
+      upload: "Vitesse de téléversement",
+      sparkline: "Afficher les courbes",
+      hours: "Fenêtre historique (heures)",
+      source: "Capteur source (attribut torrent_info)",
+      label: "Titre de la liste",
+      max_items: "Nombre de torrents affichés",
+      sort: "Tri",
+      percent_scale: "Échelle du pourcentage",
+      entity: "Entité",
+      name: "Nom affiché",
+      icon: "Icône",
+      max: "Valeur cible (anneau plein)",
+      sub: "Texte sous le ratio",
+      actions_label: "Titre de la zone d'actions",
+      perform_action: "Action à exécuter (ex. transmission.start_torrent)",
+    },
+  },
+};
+
+// Without hass (setConfig before first hass, module load) fall back to the page language.
+function trLocale(hass) {
+  return (hass && ((hass.locale && hass.locale.language) || hass.language)) ||
+    document.documentElement.lang || "en";
+}
+function trT(hass) {
+  return TR_I18N[String(trLocale(hass)).toLowerCase().indexOf("fr") === 0 ? "fr" : "en"];
+}
+
 class TransmissionStatusCard extends HTMLElement {
   /* ================= CONFIG ================= */
   setConfig(config) {
     if (!config.power_entity) {
-      throw new Error("La clé 'power_entity' est requise (switch Transmission).");
+      throw new Error(trT(this._hass).err_power);
     }
     this._config = {
       title: config.title || "Transmission",
@@ -124,7 +281,7 @@ class TransmissionStatusCard extends HTMLElement {
       this._historyFetchedAt = Date.now();
       this._render();
     } catch (err) {
-      console.warn("[transmission-status-card] Historique indisponible :", err);
+      console.warn("[transmission-status-card] History unavailable:", err);
       this._history = null;
       this._historyFetchedAt = Date.now();
     }
@@ -132,6 +289,7 @@ class TransmissionStatusCard extends HTMLElement {
 
   /* ================= SQUELETTE DOM ================= */
   _build() {
+    const t = trT(this._hass);
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
@@ -319,11 +477,11 @@ class TransmissionStatusCard extends HTMLElement {
           <div class="speed-row">
             <div class="speed sp-down">
               <div class="sic"><ha-icon icon="mdi:download"></ha-icon></div>
-              <div class="sbody"><div class="sval"></div><div class="slbl">Téléchargement</div></div>
+              <div class="sbody"><div class="sval"></div><div class="slbl">${t.download}</div></div>
             </div>
             <div class="speed sp-up">
               <div class="sic"><ha-icon icon="mdi:upload"></ha-icon></div>
-              <div class="sbody"><div class="sval"></div><div class="slbl">Téléversement</div></div>
+              <div class="sbody"><div class="sval"></div><div class="slbl">${t.upload}</div></div>
             </div>
           </div>
           <svg class="spark hidden" viewBox="0 0 340 40" preserveAspectRatio="none">
@@ -380,8 +538,10 @@ class TransmissionStatusCard extends HTMLElement {
     const hass = this._hass;
     const c = this._config;
     const r = this.shadowRoot;
+    const t = trT(hass);
 
-    const powerOn = hass.states[c.power_entity] && hass.states[c.power_entity].state === "on";
+    const pst = hass.states[c.power_entity];
+    const powerOn = !!pst && pst.state === "on";
     const dl = c.speeds && c.speeds.download ? this._num(hass.states[c.speeds.download]) : 0;
     const ul = c.speeds && c.speeds.upload ? this._num(hass.states[c.speeds.upload]) : 0;
 
@@ -412,17 +572,21 @@ class TransmissionStatusCard extends HTMLElement {
     r.querySelector(".htitle").textContent = c.title;
 
     const hstate = r.querySelector(".hstate");
-    if (c.status_entity && hass.states[c.status_entity]) {
-      hstate.textContent = hass.states[c.status_entity].state;
+    const sst = c.status_entity ? hass.states[c.status_entity] : null;
+    if (sst) {
+      // formatEntityState translates enum states (translation_key) when available
+      hstate.textContent = hass.formatEntityState ? hass.formatEntityState(sst) : sst.state;
+    } else if (!pst || pst.state === "unavailable") {
+      hstate.textContent = t.unavailable;
     } else {
-      hstate.textContent = powerOn ? "Actif" : "Arrêté";
+      hstate.textContent = powerOn ? t.active : t.stopped;
     }
     hstate.style.color = accent;
 
     const sep = r.querySelector(".hsep");
     const meta = r.querySelector(".hmeta");
     const totalCnt = c.counters.length ? hass.states[c.counters[0].entity] : null;
-    if (totalCnt) {
+    if (totalCnt && !isNaN(parseFloat(totalCnt.state))) {
       meta.textContent = this._fmt(totalCnt.state) + " " + (c.counters[0].name || "torrents").toLowerCase();
       sep.classList.remove("hidden");
       meta.classList.remove("hidden");
@@ -438,7 +602,7 @@ class TransmissionStatusCard extends HTMLElement {
       const tOn = hass.states[c.turtle_entity] && hass.states[c.turtle_entity].state === "on";
       turtle.style.background = tOn ? this._rgba("#BA7517", 0.18) : "rgba(255,255,255,0.045)";
       turtle.querySelector("ha-icon").style.color = tOn ? "#BA7517" : "var(--disabled-text-color)";
-      turtle.title = tOn ? "Mode tortue actif" : "Mode tortue inactif";
+      turtle.title = tOn ? t.turtle_on : t.turtle_off;
     } else {
       turtle.classList.add("hidden");
     }
@@ -498,12 +662,9 @@ class TransmissionStatusCard extends HTMLElement {
       const fg = ringbox.querySelector(".rfg");
       fg.setAttribute("stroke", color);
       fg.setAttribute("stroke-dasharray", (frac * 106.8).toFixed(1) + ",106.8");
-      ringbox.querySelector(".rtx").textContent = isNaN(val)
-        ? "—"
-        : val.toFixed(2).replace(".", ",");
+      ringbox.querySelector(".rtx").textContent = isNaN(val) ? "—" : this._fmtN(val, 2);
       ringbox.querySelector(".rl").textContent = c.ring.label || "Ratio";
-      ringbox.querySelector(".rv").textContent =
-        c.ring.sub || "cible " + String(max).replace(".", ",");
+      ringbox.querySelector(".rv").textContent = c.ring.sub || t.target + " " + this._fmtN(max);
       ringbox.onclick = () => this._fireMoreInfo(c.ring.entity);
     } else {
       ringbox.classList.add("hidden");
@@ -652,23 +813,31 @@ class TransmissionStatusCard extends HTMLElement {
     }
     box.classList.remove("hidden");
 
+    const t = trT(this._hass);
     const st = this._hass.states[c.torrents.source];
-    const info = st && st.attributes ? st.attributes.torrent_info : null;
+    // Attribute is dropped when the server is offline; tolerate non-object values too
+    const offline = !st || st.state === "unavailable" || st.state === "unknown";
+    const raw = st && st.attributes ? st.attributes.torrent_info : null;
+    const info = raw && typeof raw === "object" ? raw : null;
     const body = r.querySelector(".tlist-body");
     const head = r.querySelector(".tlist-head span");
-    head.textContent = c.torrents.label || "Torrents";
+    head.textContent = c.torrents.label || t.torrents;
     body.innerHTML = "";
 
     if (!info || !Object.keys(info).length) {
       const e = document.createElement("div");
       e.className = "tempty";
-      e.textContent = "Aucun torrent dans cet état.";
+      e.textContent = offline ? t.source_unavailable : t.no_torrents;
       body.appendChild(e);
       return;
     }
 
-    let items = Object.keys(info).map((name) => {
-      const d = info[name] || {};
+    // Usually { name: {...} }; accept a list of { name, ... } as well
+    const entries = Array.isArray(info)
+      ? info.map((d, i) => [(d && d.name) || "#" + (i + 1), d])
+      : Object.keys(info).map((k) => [k, info[k]]);
+    let items = entries.map(([name, raw]) => {
+      const d = raw || {};
       let pct = parseFloat(d.percent_done);
       if (isNaN(pct)) pct = 0;
       // L'intégration peut renvoyer 0-1 ou 0-100 selon la version
@@ -701,33 +870,33 @@ class TransmissionStatusCard extends HTMLElement {
     const max = c.torrents.max_items || 5;
     const shown = items.slice(0, max);
 
-    shown.forEach((t) => {
-      const done = t.pct >= 100;
+    shown.forEach((tor) => {
+      const done = tor.pct >= 100;
       const color = done ? c.color_up : c.color_down;
       const el = document.createElement("div");
       el.className = "tor";
       const bits = [];
-      if (!isNaN(t.ratio)) bits.push("ratio " + t.ratio.toFixed(2).replace(".", ","));
-      const eta = this._eta(t.eta, done);
+      if (!isNaN(tor.ratio)) bits.push("ratio " + this._fmtN(tor.ratio, 2));
+      const eta = this._eta(tor.eta, done);
       if (eta) bits.push(eta);
-      if (t.status) bits.push(String(t.status));
+      if (tor.status) bits.push(String(tor.status));
 
       el.innerHTML =
         '<div class="tor-top">' +
-          '<span class="tor-name">' + this._esc(t.name) + "</span>" +
+          '<span class="tor-name">' + this._esc(tor.name) + "</span>" +
           '<span class="tor-pct" style="color:' + color + '">' +
-            t.pct.toFixed(0) + "%</span>" +
+            tor.pct.toFixed(0) + "%</span>" +
         "</div>" +
         '<div class="tor-track"><div class="tor-fill" style="width:' +
-          t.pct.toFixed(1) + "%;background:" + color + '"></div></div>' +
-        (bits.length ? '<div class="tor-foot"><span class="sp">' + bits.join(" · ") + "</span></div>" : "");
+          tor.pct.toFixed(1) + "%;background:" + color + '"></div></div>' +
+        (bits.length ? '<div class="tor-foot"><span class="sp">' + this._esc(bits.join(" · ")) + "</span></div>" : "");
       body.appendChild(el);
     });
 
     if (items.length > shown.length) {
       const more = document.createElement("div");
       more.className = "tempty";
-      more.textContent = "+ " + (items.length - shown.length) + " autre(s)";
+      more.textContent = t.more(items.length - shown.length);
       body.appendChild(more);
     }
   }
@@ -736,19 +905,20 @@ class TransmissionStatusCard extends HTMLElement {
   _eta(raw, done) {
     if (done) return null;
     if (raw === undefined || raw === null || raw === "") return null;
-    // Peut arriver en secondes (nombre) ou en chaîne "0:23:45"
+    const t = trT(this._hass);
+    // Seconds (number) or "0:23:45" string depending on the integration version
     const n = parseFloat(raw);
     if (!isNaN(n) && String(raw).indexOf(":") === -1) {
-      if (n <= 0 || n > 31536000) return null; // inconnu / absurde
+      if (n <= 0 || n > 31536000) return null; // unknown / absurd
       const h = Math.floor(n / 3600);
       const m = Math.floor((n % 3600) / 60);
-      if (h > 24) return Math.floor(h / 24) + " j restants";
-      if (h > 0) return h + " h " + m + " min restantes";
-      return m + " min restantes";
+      if (h > 24) return t.eta_days(Math.floor(h / 24));
+      if (h > 0) return t.eta_hm(h, m);
+      return t.eta_m(m);
     }
     const s = String(raw);
     if (s.indexOf("-") === 0 || s.toLowerCase().indexOf("unknown") !== -1) return null;
-    return s + " restantes";
+    return t.eta_raw(s);
   }
 
   _num(stateObj) {
@@ -760,7 +930,16 @@ class TransmissionStatusCard extends HTMLElement {
   _fmt(state) {
     const n = parseFloat(state);
     if (isNaN(n)) return state;
-    return n.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
+    return this._fmtN(n, 0, 3);
+  }
+
+  /* Locale-aware number; with only `min`, exactly `min` decimals */
+  _fmtN(n, min, max) {
+    const lo = min || 0;
+    return Number(n).toLocaleString(trLocale(this._hass), {
+      minimumFractionDigits: lo,
+      maximumFractionDigits: max === undefined ? (lo || 3) : max,
+    });
   }
 
   _esc(s) {
@@ -796,12 +975,37 @@ class TransmissionStatusCard extends HTMLElement {
     return size;
   }
 
-  static getStubConfig() {
-    return {
+  /* Picks entities of the native Transmission integration by translation_key
+     (language independent); falls back to any switch, then a placeholder. */
+  static getStubConfig(hass) {
+    const states = (hass && hass.states) || {};
+    const ents = (hass && hass.entities) || {};
+    const find = (domain, key) => Object.keys(ents).find((id) =>
+      id.indexOf(domain + ".") === 0 && states[id] &&
+      ents[id].platform === "transmission" && (!key || ents[id].translation_key === key));
+    const turtle = find("switch", "turtle_mode");
+    const power = find("switch", "on_off") ||
+      Object.keys(ents).find((id) => id !== turtle && id.indexOf("switch.") === 0 &&
+        states[id] && ents[id].platform === "transmission") ||
+      Object.keys(states).find((id) => id.indexOf("switch.") === 0);
+    const cfg = {
       type: "custom:transmission-status-card",
       title: "Transmission",
-      power_entity: "switch.example",
+      power_entity: power || "switch.example",
     };
+    if (turtle) cfg.turtle_entity = turtle;
+    const status = find("sensor", "transmission_status");
+    if (status) cfg.status_entity = status;
+    const dl = find("sensor", "download_speed");
+    const ul = find("sensor", "upload_speed");
+    if (dl || ul) {
+      cfg.speeds = { sparkline: true, hours: 6 };
+      if (dl) cfg.speeds.download = dl;
+      if (ul) cfg.speeds.upload = ul;
+    }
+    const src = find("sensor", "active_torrents") || find("sensor", "total_torrents");
+    if (src) cfg.torrents = { source: src, max_items: 5, sort: "progress", percent_scale: "auto" };
+    return cfg;
   }
 
   static getConfigElement() {
@@ -815,7 +1019,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "transmission-status-card",
   name: "Transmission Status Card",
-  description: "Carte Transmission avec liste de torrents, vitesses et mode tortue.",
+  description: trT(null).card_desc,
 });
 
 console.info(
@@ -828,28 +1032,54 @@ console.info(
    ÉDITEUR VISUEL — transmission-status-card-editor
    ============================================================ */
 
-const TRL = {
-  title: "Titre",
-  power_entity: "Switch Transmission (requis)",
-  turtle_entity: "Switch mode tortue",
-  status_entity: "Capteur de statut",
-  download: "Vitesse de téléchargement",
-  upload: "Vitesse de téléversement",
-  sparkline: "Afficher les courbes",
-  hours: "Fenêtre historique (heures)",
-  source: "Capteur source (attribut torrent_info)",
-  label: "Titre de la liste",
-  max_items: "Nombre de torrents affichés",
-  sort: "Tri",
-  percent_scale: "Échelle du pourcentage",
-  entity: "Entité",
-  name: "Nom affiché",
-  icon: "Icône",
-  max: "Valeur cible (anneau plein)",
-  sub: "Texte sous le ratio",
-  actions_label: "Titre de la zone d'actions",
-  perform_action: "Action à exécuter (ex. transmission.start_torrent)",
-};
+/* Collapsible editor sections. Open/closed state survives editor re-creation
+   (module-level Map keyed `${tag}:${sectionId}`); only `hidden` is toggled so
+   form fields, their values and focus are never touched. */
+const TR_SECTIONS = new Map();
+let trSecSeq = 0;
+
+function trSecButton(title) {
+  return '<button type="button" class="sec-toggle"><ha-icon class="chev" icon="mdi:chevron-right"></ha-icon>' +
+    '<span class="sec-title">' + title + "</span></button>";
+}
+
+function trWireSections(root, tag, t) {
+  const secs = Array.from(root.querySelectorAll(".sec[data-sec]"));
+  const all = root.querySelector(".sec-all");
+  const uid = "trsec" + ++trSecSeq;
+  const sync = () => {
+    if (all) all.textContent = secs.some((s) => s.hasAttribute("data-closed")) ? t.expand_all : t.collapse_all;
+  };
+  const set = (s, open) => {
+    TR_SECTIONS.set(tag + ":" + s.dataset.sec, open);
+    s.toggleAttribute("data-closed", !open);
+    s.querySelector(".sec-toggle").setAttribute("aria-expanded", String(open));
+    s.querySelector(".sec-body").hidden = !open;
+  };
+  secs.forEach((s, i) => {
+    const btn = s.querySelector(".sec-toggle");
+    const body = s.querySelector(".sec-body");
+    btn.id = uid + "-" + s.dataset.sec + "-h";
+    body.id = uid + "-" + s.dataset.sec + "-b";
+    btn.setAttribute("aria-controls", body.id);
+    body.setAttribute("role", "region");
+    body.setAttribute("aria-labelledby", btn.id);
+    const saved = TR_SECTIONS.get(tag + ":" + s.dataset.sec);
+    set(s, saved === undefined ? i === 0 : saved);
+    btn.addEventListener("click", () => {
+      set(s, s.hasAttribute("data-closed"));
+      sync();
+    });
+  });
+  if (all) {
+    all.addEventListener("click", () => {
+      const open = secs.some((s) => s.hasAttribute("data-closed"));
+      secs.forEach((s) => set(s, open));
+      sync();
+    });
+  }
+  sync();
+}
 
 const TR_SCHEMA_GENERAL = [
   { name: "title", selector: { text: {} } },
@@ -879,7 +1109,7 @@ const TR_SCHEMA_SPEEDS = [
   },
 ];
 
-const TR_SCHEMA_TORRENTS = [
+const trSchemaTorrents = (t) => [
   { name: "source", selector: { entity: { filter: { domain: ["sensor"] } } } },
   {
     type: "grid",
@@ -897,9 +1127,9 @@ const TR_SCHEMA_TORRENTS = [
           select: {
             mode: "dropdown",
             options: [
-              { value: "progress", label: "Progression (incomplets d'abord)" },
-              { value: "name", label: "Nom" },
-              { value: "ratio", label: "Ratio" },
+              { value: "progress", label: t.sort_progress },
+              { value: "name", label: t.sort_name },
+              { value: "ratio", label: t.sort_ratio },
             ],
           },
         },
@@ -910,9 +1140,9 @@ const TR_SCHEMA_TORRENTS = [
           select: {
             mode: "dropdown",
             options: [
-              { value: "auto", label: "Auto (détection)" },
-              { value: "percent", label: "Déjà en % (0-100)" },
-              { value: "fraction", label: "Fraction (0-1)" },
+              { value: "auto", label: t.scale_auto },
+              { value: "percent", label: t.scale_percent },
+              { value: "fraction", label: t.scale_fraction },
             ],
           },
         },
@@ -974,17 +1204,14 @@ const TR_SCHEMA_ACTION = [
 class TransmissionStatusCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = JSON.parse(JSON.stringify(config || {}));
-    if (!this._built) {
-      this._build();
-      this._built = true;
-    }
+    this._ensureBuilt();
     this._update();
   }
 
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
-    if (!this._built) return;
+    if (!this._ensureBuilt()) return;
     // Un _update() complet à chaque changement d'état réinitialiserait les
     // champs en cours d'édition (notamment le sélecteur de couleur ouvert).
     if (first) this._update();
@@ -1017,10 +1244,20 @@ class TransmissionStatusCardEditor extends HTMLElement {
   }
 
   _computeLabel(s) {
-    return TRL[s.name] || s.name;
+    return trT(this._hass).labels[s.name] || s.name;
+  }
+
+  /* Build once both config and hass are known (labels depend on the UI language) */
+  _ensureBuilt() {
+    if (!this._built && this._hass && this._config) {
+      this._build();
+      this._built = true;
+    }
+    return !!this._built;
   }
 
   _build() {
+    const t = trT(this._hass);
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
@@ -1031,6 +1268,22 @@ class TransmissionStatusCardEditor extends HTMLElement {
           border-bottom: 1px solid var(--divider-color);
         }
         .sec-title { font-size: 15px; font-weight: 600; color: var(--primary-text-color); flex: 1; }
+        .sec-toggle {
+          flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+          background: none; border: none; padding: 2px 0; margin: 0;
+          font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 4px;
+        }
+        .chev { --mdc-icon-size: 20px; color: var(--secondary-text-color); transition: transform .2s ease; flex-shrink: 0; }
+        .sec-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+        .sec-allbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+        .sec-all {
+          background: none; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;
+          font: inherit; font-size: 12px; color: var(--secondary-text-color);
+        }
+        .sec-all:hover { color: var(--primary-text-color); }
+        .sec-toggle:focus-visible, .sec-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+        .sec-body[hidden] { display: none !important; }
+        @media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
         .sec-hint {
           font-size: 12px; color: var(--secondary-text-color);
           margin: -4px 0 10px 0; line-height: 1.4;
@@ -1067,76 +1320,91 @@ class TransmissionStatusCardEditor extends HTMLElement {
         }
       </style>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Général</span></div>
-        <ha-form class="f-general"></ha-form>
+      <div class="sec-allbar"><button type="button" class="sec-all"></button></div>
+
+      <div class="sec" data-sec="general">
+        <div class="sec-head">${trSecButton(t.sec_general)}</div>
+        <div class="sec-body"><ha-form class="f-general"></ha-form></div>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Couleurs</span></div>
-        <div class="colors">
-          <div class="color-field"><input type="color" class="c-down"><label>Téléchargement</label></div>
-          <div class="color-field"><input type="color" class="c-up"><label>Téléversement</label></div>
-          <div class="color-field"><input type="color" class="c-idle"><label>Inactif</label></div>
-          <div class="color-field"><input type="color" class="c-off"><label>Arrêté</label></div>
+      <div class="sec" data-sec="colors">
+        <div class="sec-head">${trSecButton(t.sec_colors)}</div>
+        <div class="sec-body">
+          <div class="colors">
+            <div class="color-field"><input type="color" class="c-down"><label>${t.c_down}</label></div>
+            <div class="color-field"><input type="color" class="c-up"><label>${t.c_up}</label></div>
+            <div class="color-field"><input type="color" class="c-idle"><label>${t.c_idle}</label></div>
+            <div class="color-field"><input type="color" class="c-off"><label>${t.c_off}</label></div>
+          </div>
         </div>
       </div>
 
-      <div class="sec">
+      <div class="sec" data-sec="speeds">
         <div class="sec-head">
-          <span class="sec-title">Vitesses</span>
+          ${trSecButton(t.sec_speeds)}
           <ha-switch class="sw-speeds"></ha-switch>
         </div>
-        <div class="sec-hint">Vitesses actuelles avec courbes superposées. Échelle commune aux deux pour comparer honnêtement.</div>
-        <ha-form class="f-speeds"></ha-form>
+        <div class="sec-body">
+          <div class="sec-hint">${t.hint_speeds}</div>
+          <ha-form class="f-speeds"></ha-form>
+        </div>
       </div>
 
-      <div class="sec">
+      <div class="sec" data-sec="torrents">
         <div class="sec-head">
-          <span class="sec-title">Liste des torrents</span>
+          ${trSecButton(t.sec_torrents)}
           <ha-switch class="sw-torrents"></ha-switch>
         </div>
-        <div class="sec-hint">Lit l'attribut <code>torrent_info</code>. Choisis le capteur selon les torrents voulus : total, actifs, terminés…</div>
-        <ha-form class="f-torrents"></ha-form>
+        <div class="sec-body">
+          <div class="sec-hint">${t.hint_torrents}</div>
+          <ha-form class="f-torrents"></ha-form>
+        </div>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Compteurs</span></div>
-        <div class="sec-hint">Petite rangée. Le premier sert aussi au sous-titre de l'en-tête.</div>
-        <div class="rows-counters"></div>
-        <div class="addbtn add-counter"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter un compteur</span></div>
+      <div class="sec" data-sec="counters">
+        <div class="sec-head">${trSecButton(t.sec_counters)}</div>
+        <div class="sec-body">
+          <div class="sec-hint">${t.hint_counters}</div>
+          <div class="rows-counters"></div>
+          <div class="addbtn add-counter"><ha-icon icon="mdi:plus"></ha-icon><span>${t.add_counter}</span></div>
+        </div>
       </div>
 
-      <div class="sec">
+      <div class="sec" data-sec="ring">
         <div class="sec-head">
-          <span class="sec-title">Anneau ratio</span>
+          ${trSecButton(t.sec_ring)}
           <ha-switch class="sw-ring"></ha-switch>
         </div>
-        <ha-form class="f-ring"></ha-form>
+        <div class="sec-body"><ha-form class="f-ring"></ha-form></div>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Statistiques</span></div>
-        <div class="sec-hint">Lignes à droite de l'anneau. Session, total, ratio…</div>
-        <div class="rows-stats"></div>
-        <div class="addbtn add-stat"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter une stat</span></div>
+      <div class="sec" data-sec="stats">
+        <div class="sec-head">${trSecButton(t.sec_stats)}</div>
+        <div class="sec-body">
+          <div class="sec-hint">${t.hint_stats}</div>
+          <div class="rows-stats"></div>
+          <div class="addbtn add-stat"><ha-icon icon="mdi:plus"></ha-icon><span>${t.add_stat}</span></div>
+        </div>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Actions</span></div>
-        <div class="sec-hint">Laisse "Action à exécuter" vide pour un simple toggle/press de l'entité.</div>
-        <ha-form class="f-actions-label"></ha-form>
-        <div class="rows-actions"></div>
-        <div class="addbtn add-action"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter une action</span></div>
+      <div class="sec" data-sec="actions">
+        <div class="sec-head">${trSecButton(t.sec_actions)}</div>
+        <div class="sec-body">
+          <div class="sec-hint">${t.hint_actions}</div>
+          <ha-form class="f-actions-label"></ha-form>
+          <div class="rows-actions"></div>
+          <div class="addbtn add-action"><ha-icon icon="mdi:plus"></ha-icon><span>${t.add_action}</span></div>
+        </div>
       </div>
     `;
 
     const r = this.shadowRoot;
+    trWireSections(r, "transmission-status-card-editor", t);
 
     const wire = (sel, schema, handler) => {
       const f = r.querySelector(sel);
       f.schema = schema;
-      f.computeLabel = this._computeLabel;
+      f.computeLabel = (s) => this._computeLabel(s);
       f.addEventListener("value-changed", (e) => {
         e.stopPropagation();
         handler(e.detail.value);
@@ -1154,7 +1422,7 @@ class TransmissionStatusCardEditor extends HTMLElement {
       this._config.speeds = Object.assign({}, this._config.speeds, v);
     });
 
-    wire(".f-torrents", TR_SCHEMA_TORRENTS, (v) => {
+    wire(".f-torrents", trSchemaTorrents(t), (v) => {
       this._config.torrents = Object.assign({}, this._config.torrents, v);
     });
 
@@ -1325,7 +1593,7 @@ class TransmissionStatusCardEditor extends HTMLElement {
       if (!list.length) {
         const e = document.createElement("div");
         e.className = "empty";
-        e.textContent = "Aucun élément. Utilise le bouton ci-dessous.";
+        e.textContent = trT(this._hass).empty_rows;
         container.appendChild(e);
       }
       list.forEach((item, i) => {
@@ -1376,7 +1644,7 @@ class TransmissionStatusCardEditor extends HTMLElement {
 
     const form = document.createElement("ha-form");
     form.schema = schema;
-    form.computeLabel = this._computeLabel;
+    form.computeLabel = (s) => this._computeLabel(s);
     form.hass = this._hass;
     form.data = Object.assign({}, item);
     form.addEventListener("value-changed", (e) => {
@@ -1416,7 +1684,7 @@ class TransmissionStatusCardEditor extends HTMLElement {
       applyRowColor(e.target.value);
     });
     const cl = document.createElement("label");
-    cl.textContent = "Couleur";
+    cl.textContent = trT(this._hass).color;
     cf.appendChild(ci);
     cf.appendChild(cl);
     row.appendChild(cf);

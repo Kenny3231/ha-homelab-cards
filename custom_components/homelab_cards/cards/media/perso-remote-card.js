@@ -1,13 +1,80 @@
 /**
  * perso-remote-card.js
- * Télécommande "physique" pour Home Assistant.
- * D-pad circulaire à quadrants, touches en relief, volume déporté sur un media_player.
+ * "Physical" remote control for any Home Assistant remote entity (e.g. Android TV Remote).
+ * Circular quadrant D-pad, raised keys, volume routed to a media_player.
  *
- * Auteur : Kenny3231
  * Version : 1.0.0
  */
 
 const PRC_VERSION = "1.0.0";
+
+/* UI strings. Language follows the HA UI language (fr* -> French, else English). */
+const PRC_I18N = {
+  en: {
+    err_entity: "perso-remote-card: the 'entity' key (remote domain) is required.",
+    err_domain: "perso-remote-card: 'entity' must be an entity of the remote domain.",
+    power: "On / Off",
+    unavailable: "unavailable",
+    muted: "Muted",
+    volume: "Volume",
+    card_name: "Perso — Remote",
+    card_desc: "Physical remote with a circular D-pad for a remote entity.",
+    expand_all: "Expand all",
+    collapse_all: "Collapse all",
+    sec_general: "General",
+    sec_power: "Power",
+    sec_volume: "Volume",
+    sec_display: "Display & behavior",
+    labels: {
+      entity: "Remote entity (required)",
+      name: "Display name",
+      power_entity: "Entity driven by the power button",
+      power_off_option: "Select option for \"off\"",
+      power_on_option: "Select option for \"on\"",
+      volume_entity: "Player for volume (leave empty to hide)",
+      show_nav: "Back / home / menu row",
+      show_transport: "Playback row",
+      haptic: "Haptic feedback",
+      hold_secs: "Long press duration (s)",
+    },
+  },
+  fr: {
+    err_entity: "perso-remote-card : la clé 'entity' (domaine remote) est obligatoire.",
+    err_domain: "perso-remote-card : 'entity' doit être une entité du domaine remote.",
+    power: "Marche / Arrêt",
+    unavailable: "indisponible",
+    muted: "Coupé",
+    volume: "Volume",
+    card_name: "Perso — Télécommande",
+    card_desc: "Télécommande physique avec D-pad circulaire pour une entité remote.",
+    expand_all: "Tout déplier",
+    collapse_all: "Tout replier",
+    sec_general: "Général",
+    sec_power: "Alimentation",
+    sec_volume: "Volume",
+    sec_display: "Affichage et comportement",
+    labels: {
+      entity: "Entité remote (obligatoire)",
+      name: "Nom affiché",
+      power_entity: "Entité pilotée par le bouton marche/arrêt",
+      power_off_option: "Option « éteint » du select",
+      power_on_option: "Option « allumé » du select",
+      volume_entity: "Lecteur pour le volume (laisser vide pour masquer)",
+      show_nav: "Rangée retour / accueil / menu",
+      show_transport: "Rangée lecture",
+      haptic: "Retour haptique",
+      hold_secs: "Durée d'appui long (s)",
+    },
+  },
+};
+
+// Without hass (setConfig before first hass, module load) fall back to the page language.
+function prcLocale(hass) {
+  return (hass && (hass.locale?.language || hass.language)) || document.documentElement.lang || "en";
+}
+function prcT(hass) {
+  return PRC_I18N[String(prcLocale(hass)).toLowerCase().startsWith("fr") ? "fr" : "en"];
+}
 
 /* ------------------------------------------------------------------ */
 /* Définition des touches                                              */
@@ -67,23 +134,33 @@ class PersoRemoteCard extends HTMLElement {
     return document.createElement("perso-remote-card-editor");
   }
 
+  /* Prefers an Android TV Remote entity, then any remote; the volume player is
+     the media_player sharing the remote's device (detected via hass.entities). */
   static getStubConfig(hass) {
-    const remote = Object.keys(hass.states).find((e) => e.startsWith("remote."));
-    return {
+    const ids = Object.keys(hass.states);
+    const ents = hass.entities || {};
+    const remote =
+      ids.find((e) => e.startsWith("remote.") && ents[e]?.platform === "androidtv_remote") ||
+      ids.find((e) => e.startsWith("remote."));
+    const dev = remote && ents[remote]?.device_id;
+    const player = dev && ids.find((e) => e.startsWith("media_player.") && ents[e]?.device_id === dev);
+    const cfg = {
       type: "custom:perso-remote-card",
       entity: remote || "remote.example",
       name: "",
       show_nav: true,
       show_transport: true,
     };
+    if (player) cfg.volume_entity = player;
+    return cfg;
   }
 
   setConfig(config) {
     if (!config || !config.entity) {
-      throw new Error("perso-remote-card : la clé 'entity' (domaine remote) est obligatoire.");
+      throw new Error(prcT(this._hass).err_entity);
     }
     if (config.entity.split(".")[0] !== "remote") {
-      throw new Error("perso-remote-card : 'entity' doit être une entité du domaine remote.");
+      throw new Error(prcT(this._hass).err_domain);
     }
     this._config = Object.assign({}, PRC_DEFAULTS, config);
     this._commands = Object.assign({}, config.commands || {});
@@ -332,12 +409,13 @@ class PersoRemoteCard extends HTMLElement {
     head.className = "head";
     head.innerHTML = `
       <span class="brand"></span>
-      <button class="power" type="button" title="Marche / Arrêt">
+      <button class="power" type="button">
         <ha-icon icon="mdi:power"></ha-icon>
       </button>
     `;
     body.appendChild(head);
     this._el = { brand: head.querySelector(".brand"), power: head.querySelector(".power") };
+    this._el.power.title = prcT(this._hass).power;
     this._el.power.addEventListener("click", () => this._power());
     this._el.brand.addEventListener("click", () => this._moreInfo(c.entity));
 
@@ -430,9 +508,10 @@ class PersoRemoteCard extends HTMLElement {
     this._el.power.classList.toggle("on", !off);
 
     if (c.volume_entity && this._el.vlabel) {
+      const t = prcT(h);
       const v = h.states[c.volume_entity];
-      if (!v) {
-        this._el.vlabel.textContent = "indisponible";
+      if (!v || v.state === "unavailable") {
+        this._el.vlabel.textContent = t.unavailable;
         this._el.muteIcon.setAttribute("icon", "mdi:volume-off");
       } else {
         const muted = !!v.attributes.is_volume_muted;
@@ -443,10 +522,10 @@ class PersoRemoteCard extends HTMLElement {
         );
         this._el.mute.classList.toggle("muted", muted);
         this._el.vlabel.textContent = muted
-          ? "Coupé"
+          ? t.muted
           : typeof lvl === "number"
-          ? Math.round(lvl * 100) + " %"
-          : "Volume";
+          ? new Intl.NumberFormat(prcLocale(h), { style: "percent", maximumFractionDigits: 0 }).format(lvl)
+          : t.volume;
       }
     }
   }
@@ -623,6 +702,88 @@ ha-card.prc.unavailable { opacity: .45; pointer-events: none; }
 /* Éditeur                                                             */
 /* ------------------------------------------------------------------ */
 
+/* Collapsible editor sections. Open/closed state survives editor re-creation
+   (module-level Map keyed `${tag}:${sectionId}`); only `hidden` is toggled so
+   form fields, their values and focus are never touched. */
+const PRC_SECTIONS = new Map();
+let prcSecSeq = 0;
+
+const PRC_SEC_CSS = `
+  .prc-sec { margin-bottom: 14px; }
+  .prc-sec-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--divider-color);
+  }
+  .prc-sec-toggle {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+    background: none; border: none; padding: 2px 0; margin: 0; border-radius: 4px;
+    font: inherit; font-size: 15px; font-weight: 600; color: var(--primary-text-color);
+    text-align: left; cursor: pointer;
+  }
+  .prc-chev { --mdc-icon-size: 20px; color: var(--secondary-text-color); transition: transform .2s ease; flex-shrink: 0; }
+  .prc-sec-toggle[aria-expanded="true"] .prc-chev { transform: rotate(90deg); }
+  .prc-sec-allbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  .prc-sec-all {
+    background: none; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;
+    font: inherit; font-size: 12px; color: var(--secondary-text-color);
+  }
+  .prc-sec-all:hover { color: var(--primary-text-color); }
+  .prc-sec-toggle:focus-visible, .prc-sec-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .prc-sec-body[hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .prc-chev { transition: none; } }
+`;
+
+function prcSection(id, title) {
+  const sec = document.createElement("div");
+  sec.className = "prc-sec";
+  sec.dataset.sec = id;
+  sec.innerHTML =
+    '<div class="prc-sec-head"><button type="button" class="prc-sec-toggle">' +
+    '<ha-icon class="prc-chev" icon="mdi:chevron-right"></ha-icon><span></span></button></div>' +
+    '<div class="prc-sec-body"></div>';
+  sec.querySelector(".prc-sec-toggle span").textContent = title;
+  return sec;
+}
+
+function prcWireSections(root, tag, t) {
+  const secs = Array.from(root.querySelectorAll(".prc-sec[data-sec]"));
+  const all = root.querySelector(".prc-sec-all");
+  const uid = "prcsec" + ++prcSecSeq;
+  const sync = () => {
+    if (all) all.textContent = secs.some((s) => s.hasAttribute("data-closed")) ? t.expand_all : t.collapse_all;
+  };
+  const set = (s, open) => {
+    PRC_SECTIONS.set(tag + ":" + s.dataset.sec, open);
+    s.toggleAttribute("data-closed", !open);
+    s.querySelector(".prc-sec-toggle").setAttribute("aria-expanded", String(open));
+    s.querySelector(".prc-sec-body").hidden = !open;
+  };
+  secs.forEach((s, i) => {
+    const btn = s.querySelector(".prc-sec-toggle");
+    const body = s.querySelector(".prc-sec-body");
+    btn.id = uid + "-" + s.dataset.sec + "-h";
+    body.id = uid + "-" + s.dataset.sec + "-b";
+    btn.setAttribute("aria-controls", body.id);
+    body.setAttribute("role", "region");
+    body.setAttribute("aria-labelledby", btn.id);
+    const saved = PRC_SECTIONS.get(tag + ":" + s.dataset.sec);
+    set(s, saved === undefined ? i === 0 : saved);
+    btn.addEventListener("click", () => {
+      set(s, s.hasAttribute("data-closed"));
+      sync();
+    });
+  });
+  if (all) {
+    all.addEventListener("click", () => {
+      const open = secs.some((s) => s.hasAttribute("data-closed"));
+      secs.forEach((s) => set(s, open));
+      sync();
+    });
+  }
+  sync();
+}
+
 class PersoRemoteCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = Object.assign({}, config);
@@ -631,93 +792,121 @@ class PersoRemoteCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    if (this._form) this._form.hass = hass;
+    if (this._forms) Object.values(this._forms).forEach((f) => (f.hass = hass));
+    else this._render();
   }
 
-  _schema() {
+  /* One ha-form per section; each gets the full config as data */
+  _schemas() {
     const isSelect =
       this._config &&
       this._config.power_entity &&
       ["select", "input_select"].includes(this._config.power_entity.split(".")[0]);
 
-    return [
-      {
-        name: "entity",
-        required: true,
-        selector: { entity: { filter: { domain: ["remote"] } } },
-      },
-      { name: "name", selector: { text: {} } },
-      {
-        name: "power_entity",
-        selector: {
-          entity: { filter: { domain: ["select", "input_select", "media_player", "remote"] } },
+    return {
+      general: [
+        {
+          name: "entity",
+          required: true,
+          selector: { entity: { filter: { domain: ["remote"] } } },
         },
-      },
-      ...(isSelect
-        ? [
-            { name: "power_off_option", selector: { text: {} } },
-            { name: "power_on_option", selector: { text: {} } },
-          ]
-        : []),
-      {
-        name: "volume_entity",
-        selector: { entity: { filter: { domain: ["media_player"] } } },
-      },
-      {
-        type: "grid",
-        name: "",
-        schema: [
-          { name: "show_nav", selector: { boolean: {} } },
-          { name: "show_transport", selector: { boolean: {} } },
-          { name: "haptic", selector: { boolean: {} } },
-        ],
-      },
-      { name: "hold_secs", selector: { number: { min: 0.1, max: 3, step: 0.1, mode: "box" } } },
-    ];
+        { name: "name", selector: { text: {} } },
+      ],
+      power: [
+        {
+          name: "power_entity",
+          selector: {
+            entity: { filter: { domain: ["select", "input_select", "media_player", "remote"] } },
+          },
+        },
+        ...(isSelect
+          ? [
+              { name: "power_off_option", selector: { text: {} } },
+              { name: "power_on_option", selector: { text: {} } },
+            ]
+          : []),
+      ],
+      volume: [
+        {
+          name: "volume_entity",
+          selector: { entity: { filter: { domain: ["media_player"] } } },
+        },
+      ],
+      display: [
+        {
+          type: "grid",
+          name: "",
+          schema: [
+            { name: "show_nav", selector: { boolean: {} } },
+            { name: "show_transport", selector: { boolean: {} } },
+            { name: "haptic", selector: { boolean: {} } },
+          ],
+        },
+        { name: "hold_secs", selector: { number: { min: 0.1, max: 3, step: 0.1, mode: "box" } } },
+      ],
+    };
   }
 
   _label(schema) {
-    const map = {
-      entity: "Entité remote (obligatoire)",
-      name: "Nom affiché",
-      power_entity: "Entité pilotée par le bouton marche/arrêt",
-      power_off_option: "Option « éteint » du select",
-      power_on_option: "Option « allumé » du select",
-      volume_entity: "Lecteur pour le volume (laisser vide pour masquer)",
-      show_nav: "Rangée retour / accueil / menu",
-      show_transport: "Rangée lecture",
-      haptic: "Retour haptique",
-      hold_secs: "Durée d'appui long (s)",
-    };
-    return map[schema.name] || schema.name;
+    return prcT(this._hass).labels[schema.name] || schema.name;
   }
 
-  _render() {
-    if (!this._config) return;
-    if (!this._form) {
-      this.innerHTML = "";
-      this._form = document.createElement("ha-form");
-      this._form.computeLabel = (s) => this._label(s);
-      this._form.addEventListener("value-changed", (ev) => {
+  _build() {
+    const t = prcT(this._hass);
+    this.innerHTML = "";
+    const style = document.createElement("style");
+    style.textContent = PRC_SEC_CSS;
+    this.appendChild(style);
+
+    const bar = document.createElement("div");
+    bar.className = "prc-sec-allbar";
+    bar.innerHTML = '<button type="button" class="prc-sec-all"></button>';
+    this.appendChild(bar);
+
+    this._forms = {};
+    [
+      ["general", t.sec_general],
+      ["power", t.sec_power],
+      ["volume", t.sec_volume],
+      ["display", t.sec_display],
+    ].forEach(([id, title]) => {
+      const sec = prcSection(id, title);
+      const form = document.createElement("ha-form");
+      form.computeLabel = (s) => this._label(s);
+      form.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
         const value = Object.assign({}, ev.detail.value);
         Object.keys(value).forEach((k) => {
           if (value[k] === "" || value[k] === undefined) delete value[k];
         });
         this._config = value;
-        this._form.schema = this._schema();
-        const out = new CustomEvent("config-changed", {
-          detail: { config: value },
-          bubbles: true,
-          composed: true,
-        });
-        this.dispatchEvent(out);
+        this._render(); // keeps the other forms' data in sync
+        this.dispatchEvent(
+          new CustomEvent("config-changed", {
+            detail: { config: value },
+            bubbles: true,
+            composed: true,
+          })
+        );
       });
-      this.appendChild(this._form);
-      if (this._hass) this._form.hass = this._hass;
-    }
-    this._form.data = this._config;
-    this._form.schema = this._schema();
+      sec.querySelector(".prc-sec-body").appendChild(form);
+      this.appendChild(sec);
+      this._forms[id] = form;
+    });
+    prcWireSections(this, "perso-remote-card-editor", t);
+  }
+
+  /* Built once both config and hass are known (labels depend on the UI language) */
+  _render() {
+    if (!this._config || !this._hass) return;
+    if (!this._forms) this._build();
+    const schemas = this._schemas();
+    Object.keys(this._forms).forEach((k) => {
+      const f = this._forms[k];
+      f.hass = this._hass;
+      f.data = this._config;
+      f.schema = schemas[k];
+    });
   }
 }
 
@@ -733,8 +922,8 @@ if (!customElements.get("perso-remote-card-editor")) {
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "perso-remote-card",
-  name: "Perso — Télécommande",
-  description: "Télécommande physique avec D-pad circulaire pour une entité remote.",
+  name: prcT(null).card_name,
+  description: prcT(null).card_desc,
   preview: true,
 });
 

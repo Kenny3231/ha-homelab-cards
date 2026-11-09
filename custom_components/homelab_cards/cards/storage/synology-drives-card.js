@@ -1,20 +1,68 @@
 /**
- * Synology Drives Card — disques DSM
- * Version 1.0.0
+ * Synology Drives Card — DSM drives
+ * Version 1.1.0
  *
- * Affiche l'état, la température et les deux alarmes S.M.A.R.T. que
- * l'intégration Synology expose : secteurs défectueux et durée de vie.
+ * Shows status, temperature and the two S.M.A.R.T. alarms exposed by the
+ * native "synology_dsm" integration: bad sectors and remaining life.
  *
- * ⚠️ Ces binary_sensor sont en device_class "problem" : l'état "on" signifie
- *    qu'un problème EST détecté. La carte en tient compte automatiquement.
+ * These binary_sensors use device_class "safety"/"problem": "on" means a
+ * problem IS detected. The card handles the inversion automatically.
  *
- * Installation :
- *  1. config/www/perso/synology-drives-card.js
- *  2. Resources → /local/perso/synology-drives-card.js?v=1 → JavaScript Module
- *  3. Ctrl+Shift+R
+ * Without a `drives` list, every Synology drive is detected automatically
+ * (platform + translation_key, never display names), optionally limited to
+ * one NAS with `device_id`.
  */
 
-const SYDRV_VERSION = "1.0.0";
+const SYDRV_VERSION = "1.1.0";
+
+/* ---------- i18n ---------- */
+const SD_I18N = {
+  fr: {
+    title: "Disques", drive: "Disque",
+    healthy: (n) => n + " sain" + (n > 1 ? "s" : ""),
+    count: (n) => n + " disque" + (n > 1 ? "s" : ""),
+    none: "Aucun disque Synology détecté.",
+    sectors_ok: "secteurs OK", sectors_ko: "secteurs défectueux",
+    life_ok: "durée de vie OK", life_ko: "fin de vie proche",
+    sec_gen: "Général", sec_color: "Couleur", sec_labels: "Libellés des alarmes", sec_drives: "Disques",
+    expand_all: "Tout déplier", collapse_all: "Tout replier",
+    accent: "Accent", empty: "Aucun disque : détection automatique.", add: "Ajouter un disque",
+    hint_drives: "Liste vide = tous les disques Synology détectés automatiquement. Les alarmes Synology sont en device_class « safety » : leur lecture est inversée automatiquement. Coche « Inverser » seulement si un disque sain apparaît en défaut.",
+    l_device_id: "NAS Synology (filtre de détection)",
+    l_title: "Titre", l_icon: "Icône", l_temp_warn: "Température d'alerte (°C)",
+    l_temp_critical: "Température critique (°C)", l_show_alarms: "Afficher les alarmes S.M.A.R.T.",
+    l_label_sectors_ok: "Libellé secteurs — OK", l_label_sectors_ko: "Libellé secteurs — problème",
+    l_label_life_ok: "Libellé durée de vie — OK", l_label_life_ko: "Libellé durée de vie — problème",
+    l_name: "Nom du disque", l_status: "État", l_temperature: "Température",
+    l_bad_sectors: "Alarme secteurs défectueux", l_remaining_life: "Alarme durée de vie",
+    l_size: "Taille", l_alarm_invert: "Inverser la lecture des alarmes",
+  },
+  en: {
+    title: "Drives", drive: "Drive",
+    healthy: (n) => n + " healthy",
+    count: (n) => n + " drive" + (n > 1 ? "s" : ""),
+    none: "No Synology drive detected.",
+    sectors_ok: "sectors OK", sectors_ko: "bad sectors",
+    life_ok: "lifespan OK", life_ko: "end of life near",
+    sec_gen: "General", sec_color: "Color", sec_labels: "Alarm labels", sec_drives: "Drives",
+    expand_all: "Expand all", collapse_all: "Collapse all",
+    accent: "Accent", empty: "No drive: automatic detection.", add: "Add a drive",
+    hint_drives: "Empty list = every Synology drive is detected automatically. Synology alarms use device_class “safety”: they are inverted automatically. Tick “Invert” only if a healthy drive shows as failing.",
+    l_device_id: "Synology NAS (detection filter)",
+    l_title: "Title", l_icon: "Icon", l_temp_warn: "Warning temperature (°C)",
+    l_temp_critical: "Critical temperature (°C)", l_show_alarms: "Show S.M.A.R.T. alarms",
+    l_label_sectors_ok: "Sectors label — OK", l_label_sectors_ko: "Sectors label — problem",
+    l_label_life_ok: "Lifespan label — OK", l_label_life_ko: "Lifespan label — problem",
+    l_name: "Drive name", l_status: "Status", l_temperature: "Temperature",
+    l_bad_sectors: "Bad sectors alarm", l_remaining_life: "Remaining life alarm",
+    l_size: "Size", l_alarm_invert: "Invert alarm reading",
+  },
+};
+const kLocale = (h) => (h && ((h.locale && h.locale.language) || h.language)) || "en";
+const kLang = (h) => (String(kLocale(h)).toLowerCase().indexOf("fr") === 0 ? "fr" : "en");
+const sdT = (lang, k) => (SD_I18N[lang][k] !== undefined ? SD_I18N[lang][k] : SD_I18N.en[k] !== undefined ? SD_I18N.en[k] : k);
+/* Shared by all instances: every card on a page receives the same hass locale. */
+let K_LOC = "en";
 
 const kRgba = (c, a) => {
   if (!c || c.indexOf("var(") === 0 || c.indexOf("rgb") === 0) return c;
@@ -31,14 +79,14 @@ const kFmt = (st, d) => {
   if (!st) return "—";
   const n = parseFloat(st.state);
   if (isNaN(n)) return st.state;
-  return n.toLocaleString("fr-FR", { maximumFractionDigits: d === undefined ? 0 : d });
+  return n.toLocaleString(K_LOC, { maximumFractionDigits: d === undefined ? 0 : d });
 };
 const kUnit = (st) => (st && st.attributes ? st.attributes.unit_of_measurement || "" : "");
 const kEsc = (s) => String(s).replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-/* Un binary_sensor de device_class "problem" est inversé : "on" = problème.
-   Renvoie true si tout va bien, false si problème, null si indéterminé. */
+/* A "problem"/"safety" binary_sensor is inverted: "on" = problem.
+   Returns true if fine, false on problem, null if unknown. */
 function kAlarmOk(st, invert) {
   if (!st) return null;
   const s = String(st.state).toLowerCase();
@@ -53,7 +101,7 @@ function kAlarmOk(st, invert) {
   return null;
 }
 
-/* Classe un état textuel de disque */
+/* Classifies a raw drive status (API values, not translated) */
 function kStatusKind(raw) {
   if (raw === undefined || raw === null) return null;
   const s = String(raw).toLowerCase();
@@ -65,44 +113,90 @@ function kStatusKind(raw) {
   return "warn";
 }
 
+/* ---------- synology_dsm auto-detection ---------- */
+const K_AUTO = {
+  disk_status: "status", disk_smart_status: "_smart",
+  disk_exceed_bad_sector_thr: "bad_sectors", disk_below_remain_life_thr: "remaining_life",
+};
+/* One drive per Synology child device carrying disk_* entities.
+   nasId (optional) keeps only the drives of that NAS. */
+function kDetect(hass, nasId) {
+  const devs = hass.devices || {};
+  const ents = Object.values(hass.entities || {})
+    .filter((e) => e.platform === "synology_dsm" && e.device_id &&
+      (!nasId || (devs[e.device_id] && devs[e.device_id].via_device_id === nasId)));
+  const by = {};
+  ents.forEach((e) => {
+    const f = K_AUTO[e.translation_key];
+    if (f) (by[e.device_id] = by[e.device_id] || {})[f] = e.entity_id;
+  });
+  /* Drive temperature has no translation_key: match by device_class on the drive device. */
+  ents.forEach((e) => {
+    const it = by[e.device_id], st = hass.states[e.entity_id];
+    if (it && !it.temperature && e.entity_id.indexOf("sensor.") === 0 && !e.translation_key &&
+        st && st.attributes && st.attributes.device_class === "temperature") it.temperature = e.entity_id;
+  });
+  return Object.keys(by).map((id) => {
+    const it = by[id], d = devs[id] || {}, p = devs[d.via_device_id];
+    if (!it.status && it._smart) it.status = it._smart;
+    delete it._smart;
+    /* Integration names child devices "<nas> (<drive>)": keep the drive part. */
+    let n = d.name_by_user || d.name || "";
+    if (!d.name_by_user && p && p.name && n.indexOf(p.name + " (") === 0 && n.slice(-1) === ")") {
+      n = n.slice(p.name.length + 2, -1);
+    }
+    if (n) it.name = n;
+    return it;
+  }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }));
+}
+
 class SynologyDrivesCard extends HTMLElement {
   setConfig(config) {
-    if (!config.drives || !config.drives.length) {
-      throw new Error("La clé 'drives' est requise (au moins un disque).");
-    }
     this._config = {
-      title: config.title || "Disques",
+      title: config.title || null,
       icon: config.icon || "mdi:harddisk",
       accent: config.accent || "#7F77DD",
       temp_warn: config.temp_warn || 45,
       temp_critical: config.temp_critical || 55,
       show_alarms: config.show_alarms !== false,
-      label_sectors_ok: config.label_sectors_ok || "secteurs OK",
-      label_sectors_ko: config.label_sectors_ko || "secteurs défectueux",
-      label_life_ok: config.label_life_ok || "durée de vie OK",
-      label_life_ko: config.label_life_ko || "fin de vie proche",
-      drives: config.drives,
+      label_sectors_ok: config.label_sectors_ok || null,
+      label_sectors_ko: config.label_sectors_ko || null,
+      label_life_ok: config.label_life_ok || null,
+      label_life_ko: config.label_life_ko || null,
+      device_id: config.device_id || null,
+      /* Explicit list wins; without it, drives are auto-detected. */
+      drives: config.drives && config.drives.length ? config.drives : null,
     };
+    this._auto = [];
+    this._entRef = undefined;
     this._built = false;
   }
 
   set hass(hass) {
     this._hass = hass;
+    K_LOC = kLocale(hass);
+    this._lang = kLang(hass);
+    if (!this._config.drives && hass.entities !== this._entRef) {
+      this._entRef = hass.entities; this._auto = kDetect(hass, this._config.device_id); this._last = null;
+    }
     if (!this._built) { this._build(); this._built = true; }
     const sig = this._sig(hass);
     if (sig !== this._last) { this._last = sig; this._render(); }
   }
+  _t(k) { return sdT(this._lang || "en", k); }
+  _drives() { return this._config.drives || this._auto; }
 
   _ids() {
     const ids = [];
-    this._config.drives.forEach((d) => {
+    this._drives().forEach((d) => {
       ["status", "temperature", "bad_sectors", "remaining_life", "size"]
         .forEach((k) => d[k] && ids.push(d[k]));
     });
     return [...new Set(ids)];
   }
   _sig(h) {
-    return this._ids().map((id) => id + ":" + (h.states[id] ? h.states[id].state : "∅")).join("|");
+    return this._drives().length + "#" +
+      this._ids().map((id) => id + ":" + (h.states[id] ? h.states[id].state : "∅")).join("|");
   }
 
   _tempColor(t) {
@@ -113,7 +207,7 @@ class SynologyDrivesCard extends HTMLElement {
     return "var(--disabled-text-color)";
   }
 
-  /* Un disque est sain si son état est normal ET qu'aucune alarme n'est levée */
+  /* A drive is healthy if its status is normal AND no alarm is raised */
   _overall(d) {
     const hass = this._hass;
     const kind = d.status && hass.states[d.status]
@@ -131,7 +225,7 @@ class SynologyDrivesCard extends HTMLElement {
   }
 
   _build() {
-    this.attachShadow({ mode: "open" });
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
         ha-card { border-radius:14px; padding:0; overflow:hidden;
@@ -161,6 +255,7 @@ class SynologyDrivesCard extends HTMLElement {
           font-size:10px; color:var(--disabled-text-color); line-height:1.5; }
         .dk-foot span { white-space:nowrap; }
         .dk-foot ha-icon { --mdc-icon-size:11px; vertical-align:-1px; }
+        .none { font-size:11px; color:var(--secondary-text-color); font-style:italic; }
         .hidden { display:none !important; }
       </style>
       <ha-card>
@@ -174,6 +269,7 @@ class SynologyDrivesCard extends HTMLElement {
 
   _render() {
     const hass = this._hass, c = this._config, r = this.shadowRoot;
+    const drives = this._drives();
 
     r.querySelector("ha-card").style.borderColor = kRgba(c.accent, 0.28);
     const disc = r.querySelector(".disc");
@@ -181,22 +277,27 @@ class SynologyDrivesCard extends HTMLElement {
     const ic = disc.querySelector("ha-icon");
     ic.setAttribute("icon", c.icon);
     ic.style.color = c.accent;
-    r.querySelector(".htitle").textContent = c.title;
+    r.querySelector(".htitle").textContent = c.title || this._t("title");
 
     let ok = 0, known = 0;
-    c.drives.forEach((d) => {
+    drives.forEach((d) => {
       const o = this._overall(d);
       if (o !== null) { known++; if (o === "ok") ok++; }
     });
     r.querySelector(".hsub").innerHTML = known
       ? '<b style="color:' + (ok === known ? "#1D9E75" : "#E24B4A") + '">' +
-        ok + " sain" + (ok > 1 ? "s" : "") + "</b> / " + known
-      : c.drives.length + " disque" + (c.drives.length > 1 ? "s" : "");
+        kEsc(this._t("healthy")(ok)) + "</b> / " + known
+      : kEsc(this._t("count")(drives.length));
 
     const list = r.querySelector(".list");
     list.innerHTML = "";
+    if (!drives.length) {
+      const e = document.createElement("div");
+      e.className = "none"; e.textContent = this._t("none");
+      list.appendChild(e);
+    }
 
-    c.drives.forEach((d) => {
+    drives.forEach((d) => {
       const overall = this._overall(d);
       const dotCol = overall === "bad" ? "#E24B4A"
         : overall === "warn" ? "#BA7517"
@@ -220,7 +321,7 @@ class SynologyDrivesCard extends HTMLElement {
       if (tempSt) {
         const t = kNum(tempSt);
         foot.push('<span style="color:' + this._tempColor(t) +
-          '"><ha-icon icon="mdi:thermometer"></ha-icon> ' + kFmt(tempSt, 0) + " " +
+          '"><ha-icon icon="mdi:thermometer"></ha-icon> ' + kEsc(kFmt(tempSt, 0)) + " " +
           kEsc(kUnit(tempSt) || "°C") + "</span>");
       }
       if (c.show_alarms) {
@@ -233,15 +334,15 @@ class SynologyDrivesCard extends HTMLElement {
             '" style="color:' + (a ? "#1D9E75" : "#E24B4A") + '"></ha-icon> ' +
             kEsc(a ? okLbl : koLbl) + "</span>");
         };
-        mkAlarm(d.bad_sectors, c.label_sectors_ok, c.label_sectors_ko);
-        mkAlarm(d.remaining_life, c.label_life_ok, c.label_life_ko);
+        mkAlarm(d.bad_sectors, c.label_sectors_ok || this._t("sectors_ok"), c.label_sectors_ko || this._t("sectors_ko"));
+        mkAlarm(d.remaining_life, c.label_life_ok || this._t("life_ok"), c.label_life_ko || this._t("life_ko"));
       }
 
       el.innerHTML =
         '<div class="dk-top">' +
           '<span class="dot" style="background:' + dotCol + '"></span>' +
-          '<span class="dk-name">' + kEsc(d.name || "Disque") + "</span>" +
-          (sizeSt ? '<span class="dk-size">' + kFmt(sizeSt, 0) + " " +
+          '<span class="dk-name">' + kEsc(d.name || this._t("drive")) + "</span>" +
+          (sizeSt ? '<span class="dk-size">' + kEsc(kFmt(sizeSt, 0)) + " " +
             kEsc(kUnit(sizeSt)) + "</span>" : "") +
           stateHtml +
         "</div>" +
@@ -260,24 +361,58 @@ class SynologyDrivesCard extends HTMLElement {
     this.dispatchEvent(ev);
   }
 
-  getCardSize() { return 2 + this._config.drives.length; }
-  static getStubConfig() {
-    return { type: "custom:synology-drives-card", title: "Disques", drives: [{ name: "Drive 1" }] };
-  }
+  getCardSize() { return 2 + Math.max(this._drives().length, 1); }
+  /* No list in the stub: drives are auto-detected. */
+  static getStubConfig() { return { type: "custom:synology-drives-card" }; }
   static getConfigElement() { return document.createElement("synology-drives-card-editor"); }
 }
 customElements.define("synology-drives-card", SynologyDrivesCard);
 
-/* ================= ÉDITEUR ================= */
-const SD_L = {
-  title: "Titre", icon: "Icône", temp_warn: "Température d'alerte (°C)",
-  temp_critical: "Température critique (°C)", show_alarms: "Afficher les alarmes S.M.A.R.T.",
-  label_sectors_ok: "Libellé secteurs — OK", label_sectors_ko: "Libellé secteurs — problème",
-  label_life_ok: "Libellé durée de vie — OK", label_life_ko: "Libellé durée de vie — problème",
-  name: "Nom du disque", status: "État", temperature: "Température",
-  bad_sectors: "Alarme secteurs défectueux", remaining_life: "Alarme durée de vie",
-  size: "Taille", alarm_invert: "Inverser la lecture des alarmes",
-};
+/* ================= EDITOR ================= */
+
+/* ---------- Collapsible sections (open state survives editor re-creation) ---------- */
+const SD_SEC_STATE = new Map(); /* `${tagName}:${sectionId}` -> open */
+const SD_SEC_CSS = `
+  .sec-tools { display:flex; justify-content:flex-end; gap:4px; margin-bottom:6px; }
+  .sec-tools button { background:none; border:none; cursor:pointer; padding:2px 6px;
+    border-radius:4px; font:inherit; font-size:12px; color:var(--secondary-text-color); }
+  .sec-tools button:hover { color:var(--primary-text-color); }
+  .sec-head { width:100%; display:flex; align-items:center; gap:8px; margin:0 0 10px 0;
+    padding:0 0 6px 0; background:none; border:none; border-bottom:1px solid var(--divider-color);
+    cursor:pointer; font:inherit; text-align:left; color:var(--primary-text-color); }
+  .sec-head[aria-expanded="false"] { margin-bottom:0; }
+  .sec-head:focus-visible, .sec-tools button:focus-visible {
+    outline:2px solid var(--primary-color); outline-offset:2px; border-radius:4px; }
+  .sec-head .chev { --mdc-icon-size:20px; color:var(--secondary-text-color); transition:transform .2s ease; }
+  .sec-head[aria-expanded="false"] .chev { transform:rotate(-90deg); }
+  .sec-body[hidden] { display:none; }
+`;
+const sdSec = (id, title, body) =>
+  '<div class="sec" data-sec="' + id + '"><button type="button" class="sec-head" aria-controls="sec-' + id + '">' +
+  '<ha-icon class="chev" icon="mdi:chevron-down"></ha-icon><span class="sec-title">' + kEsc(title) + "</span></button>" +
+  '<div class="sec-body" id="sec-' + id + '">' + body + "</div></div>";
+const sdSecTools = (L) =>
+  '<div class="sec-tools"><button type="button" class="sec-all" data-open="1">' + kEsc(sdT(L, "expand_all")) +
+  '</button><button type="button" class="sec-all" data-open="0">' + kEsc(sdT(L, "collapse_all")) + "</button></div>";
+/* First section open by default, the others collapsed. Only toggles `hidden`:
+   fields are never re-created, so focus and typed values are kept. */
+function sdSecWire(root, tag) {
+  const secs = root.querySelectorAll(".sec");
+  const set = (sec, open) => {
+    SD_SEC_STATE.set(tag + ":" + sec.dataset.sec, open);
+    sec.querySelector(".sec-head").setAttribute("aria-expanded", String(open));
+    sec.querySelector(".sec-body").hidden = !open;
+  };
+  secs.forEach((sec, i) => {
+    const k = tag + ":" + sec.dataset.sec;
+    set(sec, SD_SEC_STATE.has(k) ? SD_SEC_STATE.get(k) : i === 0);
+    const head = sec.querySelector(".sec-head");
+    head.addEventListener("click", () => set(sec, head.getAttribute("aria-expanded") !== "true"));
+  });
+  root.querySelectorAll(".sec-all").forEach((b) =>
+    b.addEventListener("click", () => secs.forEach((s) => set(s, b.dataset.open === "1"))));
+}
+
 const SD_SENSOR = { entity: { filter: { domain: ["sensor"] } } };
 const SD_BIN = { entity: { filter: { domain: ["binary_sensor", "sensor"] } } };
 const SD_S_GEN = [
@@ -285,6 +420,7 @@ const SD_S_GEN = [
     { name: "title", selector: { text: {} } },
     { name: "icon", selector: { icon: {} } },
   ]},
+  { name: "device_id", selector: { device: { filter: { integration: "synology_dsm" } } } },
   { type: "grid", schema: [
     { name: "temp_warn", selector: { number: { min: 20, max: 100, mode: "box" } } },
     { name: "temp_critical", selector: { number: { min: 20, max: 100, mode: "box" } } },
@@ -314,13 +450,11 @@ const SD_S_DRIVE = [
 class SynologyDrivesCardEditor extends HTMLElement {
   setConfig(cfg) {
     this._config = JSON.parse(JSON.stringify(cfg || {}));
-    if (!this._built) { this._build(); this._built = true; }
     this._update();
   }
   set hass(h) {
     const first = !this._hass; this._hass = h;
-    if (!this._built) return;
-    if (first) this._update(); else this._refreshHass();
+    if (first || !this._built) this._update(); else this._refreshHass();
   }
   _refreshHass() { this.shadowRoot.querySelectorAll("ha-form").forEach((f) => { f.hass = this._hass; }); }
   _setColor(sel, v) {
@@ -332,15 +466,17 @@ class SynologyDrivesCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config: this._config }, bubbles: true, composed: true }));
   }
-  _label(s) { return SD_L[s.name] || s.name; }
+  _t(k) { return sdT(this._lang, k); }
+  _label(s) { return sdT(this._lang, "l_" + s.name); }
 
+  /* Built once hass is known, so the UI language is available. */
   _build() {
-    this.attachShadow({ mode: "open" });
+    this._lang = kLang(this._hass);
+    const t = (k) => kEsc(this._t(k));
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
         .sec { margin-bottom:18px; }
-        .sec-head { display:flex; align-items:center; gap:8px; margin-bottom:10px;
-          padding-bottom:6px; border-bottom:1px solid var(--divider-color); }
         .sec-title { font-size:15px; font-weight:600; color:var(--primary-text-color); flex:1; }
         .sec-hint { font-size:12px; color:var(--secondary-text-color); margin:-4px 0 10px 0; line-height:1.4; }
         .colors { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
@@ -362,29 +498,32 @@ class SynologyDrivesCardEditor extends HTMLElement {
           color:var(--primary-text-color); user-select:none; }
         .addbtn:hover { background:var(--divider-color); }
         .empty { font-size:12px; color:var(--secondary-text-color); font-style:italic; margin-bottom:10px; }
+        ${SD_SEC_CSS}
       </style>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Général</span></div>
-        <ha-form class="f-gen"></ha-form></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Couleur</span></div>
+      ${sdSecTools(this._lang)}
+      ${sdSec("gen", this._t("sec_gen"), `<ha-form class="f-gen"></ha-form>`)}
+      ${sdSec("color", this._t("sec_color"), `
         <div class="colors">
-          <div class="color-field"><input type="color" class="c-accent"><label>Accent</label></div>
-        </div></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Libellés des alarmes</span></div>
-        <ha-form class="f-labels"></ha-form></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Disques</span></div>
-        <div class="sec-hint">Les alarmes Synology sont en device_class « problem » : leur lecture est inversée automatiquement. Coche « Inverser » seulement si un disque sain apparaît en défaut.</div>
+          <div class="color-field"><input type="color" class="c-accent"><label>${t("accent")}</label></div>
+        </div>`)}
+      ${sdSec("labels", this._t("sec_labels"), `<ha-form class="f-labels"></ha-form>`)}
+      ${sdSec("drives", this._t("sec_drives"), `
+        <div class="sec-hint">${t("hint_drives")}</div>
         <div class="rows-drives"></div>
-        <div class="addbtn add-drive"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter un disque</span></div></div>
+        <div class="addbtn add-drive"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add")}</span></div>`)}
     `;
     const r = this.shadowRoot;
+    sdSecWire(r, this.tagName.toLowerCase());
     const wire = (sel, schema, fn) => {
       const f = r.querySelector(sel);
-      f.schema = schema; f.computeLabel = this._label;
+      f.schema = schema; f.computeLabel = (s) => this._label(s);
       f.addEventListener("value-changed", (e) => { e.stopPropagation(); fn(e.detail.value); this._emit(); });
     };
     wire(".f-gen", SD_S_GEN, (v) => {
       Object.assign(this._config, v);
-      if (this._config.title === "") delete this._config.title;
+      ["title", "device_id"].forEach((k) => {
+        if (this._config[k] === "" || this._config[k] === undefined) delete this._config[k];
+      });
     });
     wire(".f-labels", SD_S_LABELS, (v) => {
       Object.assign(this._config, v);
@@ -393,9 +532,9 @@ class SynologyDrivesCardEditor extends HTMLElement {
     });
     const el = r.querySelector(".c-accent");
     const apply = (v) => { this._config.accent = v; this._emit(); };
-    let t = null;
-    el.addEventListener("input", (e) => { const v = e.target.value; clearTimeout(t); t = setTimeout(() => apply(v), 200); });
-    el.addEventListener("change", (e) => { clearTimeout(t); apply(e.target.value); });
+    let t2 = null;
+    el.addEventListener("input", (e) => { const v = e.target.value; clearTimeout(t2); t2 = setTimeout(() => apply(v), 200); });
+    el.addEventListener("change", (e) => { clearTimeout(t2); apply(e.target.value); });
     r.querySelector(".add-drive").addEventListener("click", () => {
       this._config.drives = (this._config.drives || []).concat([{ name: "" }]);
       this._emit(); this._update(true);
@@ -404,21 +543,22 @@ class SynologyDrivesCardEditor extends HTMLElement {
 
   _update(force) {
     if (!this._hass || !this._config) return;
+    if (!this._built) { this._build(); this._built = true; }
     const r = this.shadowRoot, c = this._config;
     const f = r.querySelector(".f-gen");
     f.hass = this._hass;
     f.data = {
-      title: c.title || "", icon: c.icon || "mdi:harddisk",
+      title: c.title || "", icon: c.icon || "mdi:harddisk", device_id: c.device_id || "",
       temp_warn: c.temp_warn || 45, temp_critical: c.temp_critical || 55,
       show_alarms: c.show_alarms !== false,
     };
     const fl = r.querySelector(".f-labels");
     fl.hass = this._hass;
     fl.data = {
-      label_sectors_ok: c.label_sectors_ok || "secteurs OK",
-      label_sectors_ko: c.label_sectors_ko || "secteurs défectueux",
-      label_life_ok: c.label_life_ok || "durée de vie OK",
-      label_life_ko: c.label_life_ko || "fin de vie proche",
+      label_sectors_ok: c.label_sectors_ok || this._t("sectors_ok"),
+      label_sectors_ko: c.label_sectors_ko || this._t("sectors_ko"),
+      label_life_ok: c.label_life_ok || this._t("life_ok"),
+      label_life_ko: c.label_life_ko || this._t("life_ko"),
     };
     this._setColor(".c-accent", c.accent || "#7F77DD");
 
@@ -429,7 +569,7 @@ class SynologyDrivesCardEditor extends HTMLElement {
       box.innerHTML = "";
       if (!list.length) {
         const e = document.createElement("div");
-        e.className = "empty"; e.textContent = "Aucun disque.";
+        e.className = "empty"; e.textContent = this._t("empty");
         box.appendChild(e);
       }
       list.forEach((it, i) => box.appendChild(this._row(it, i, list.length)));
@@ -449,7 +589,7 @@ class SynologyDrivesCardEditor extends HTMLElement {
     head.className = "row-head";
     const num = document.createElement("span");
     num.className = "row-num";
-    num.textContent = item.name || "Disque #" + (index + 1);
+    num.textContent = item.name || this._t("drive") + " #" + (index + 1);
     head.appendChild(num);
     const mk = (icon, cls, fn, dis) => {
       const b = document.createElement("ha-icon-button");
@@ -461,12 +601,13 @@ class SynologyDrivesCardEditor extends HTMLElement {
     head.appendChild(mk("mdi:arrow-down", "down", () => this._move(index, 1), index === total - 1));
     head.appendChild(mk("mdi:delete-outline", "del", () => {
       this._config.drives = this._config.drives.filter((_, i) => i !== index);
+      if (!this._config.drives.length) delete this._config.drives; /* back to auto-detection */
       this._emit(); this._update(true);
     }));
     row.appendChild(head);
 
     const f = document.createElement("ha-form");
-    f.schema = SD_S_DRIVE; f.computeLabel = this._label; f.hass = this._hass;
+    f.schema = SD_S_DRIVE; f.computeLabel = (s) => this._label(s); f.hass = this._hass;
     f.data = Object.assign({ alarm_invert: false }, item);
     f.addEventListener("value-changed", (e) => {
       e.stopPropagation();
@@ -496,16 +637,20 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "synology-drives-card",
   name: "Synology Drives Card",
-  description: "Disques Synology : état, température et alarmes S.M.A.R.T.",
+  description: "Synology drives: status, temperature and S.M.A.R.T. alarms.",
 });
 console.info("%c SYNOLOGY-DRIVES-CARD %c v" + SYDRV_VERSION + " ",
   "color:#fff;background:#7F77DD;font-weight:700", "color:#7F77DD;background:#222");
 
 /* ============================================================
-EXEMPLE DE CONFIG
+CONFIG EXAMPLES
 
+# Minimal: every Synology drive auto-detected
 type: custom:synology-drives-card
-title: Disques
+
+# Explicit list (wins over detection)
+type: custom:synology-drives-card
+title: Drives
 icon: mdi:harddisk
 accent: "#7F77DD"
 temp_warn: 45
@@ -513,13 +658,8 @@ temp_critical: 55
 show_alarms: true
 drives:
   - name: Drive 1
-    status: sensor.syno_drive_1_status
-    temperature: sensor.syno_drive_1_temperature
-    bad_sectors: binary_sensor.syno_drive_1_exceeded_max_bad_sectors
-    remaining_life: binary_sensor.syno_drive_1_below_min_remaining_life
-  - name: Drive 2
-    status: sensor.syno_drive_2_status
-    temperature: sensor.syno_drive_2_temperature
-    bad_sectors: binary_sensor.syno_drive_2_exceeded_max_bad_sectors
-    remaining_life: binary_sensor.syno_drive_2_below_min_remaining_life
+    status: sensor.example_nas_drive_1_status
+    temperature: sensor.example_nas_drive_1_temperature
+    bad_sectors: binary_sensor.example_nas_drive_1_exceeded_max_bad_sectors
+    remaining_life: binary_sensor.example_nas_drive_1_below_min_remaining_life
 ============================================================ */

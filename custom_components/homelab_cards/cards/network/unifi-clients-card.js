@@ -10,14 +10,131 @@
  *    Vérifie dans Developer Tools → States. Le nom de l'attribut est configurable
  *    via `auto.ip_attribute` (défaut : "ip"). Sans attribut IP, le filtre de plage
  *    est ignoré et tous les appareils passent (voir `auto.require_ip`).
+ *    `auto.platform` (ex. "unifi") limite la découverte aux trackers d'une intégration.
  *
- * Installation :
- *  1. config/www/perso/unifi-clients-card.js
- *  2. Resources → /local/perso/unifi-clients-card.js?v=1 → JavaScript Module
- *  3. Ctrl+Shift+R
+ * Loaded as a module by the homelab_cards integration.
  */
 
 const UCL_VERSION = "1.1.1";
+
+/* ---------- i18n ---------- */
+const UCL_I18N = {
+  fr: {
+    title: "Équipements", home_one: "connecté", home_other: "connectés",
+    away_one: "absent", away_other: "absents", away: "absent",
+    tab_all: "Tous", tab_home: "Connectés", tab_away: "Absents",
+    sort: "Trier", sort_status: "État", sort_name: "Nom", sort_ip: "IP",
+    asc: "Croissant", desc: "Décroissant", none: "Aucun appareil à afficher.",
+    warn_ip: "Filtre IP configuré mais aucun appareil n'expose l'attribut « {attr} ». Vérifie le nom de l'attribut dans Developer Tools → States.",
+    devices: "appareils",
+    description: "Équipements connectés : liste manuelle et/ou découverte par plage IP.",
+    expand_all: "Tout déplier", collapse_all: "Tout replier",
+    sec_general: "Général", sec_colors: "Couleurs", sec_devices: "Appareils listés",
+    sec_auto: "Découverte automatique", c_accent: "Accent", c_home: "Connecté",
+    hint_devices: "Liste manuelle, affichée en premier. Le trafic est optionnel.",
+    add_device: "Ajouter un appareil",
+    hint_auto: "Ajoute tous les <code>device_tracker</code> non déjà listés, filtrés par plage IP.",
+    ranges: "Plages IP (une par ligne)", formats: "Formats acceptés :",
+    ranges_empty: "Laisse vide pour ne filtrer sur aucune plage.",
+    no_device: "Aucun appareil listé.", device_n: "Appareil #",
+    opt_status: "Connectés d'abord", opt_name: "Nom", opt_ip: "Adresse IP",
+  },
+  en: {
+    title: "Devices", home_one: "connected", home_other: "connected",
+    away_one: "away", away_other: "away", away: "away",
+    tab_all: "All", tab_home: "Connected", tab_away: "Away",
+    sort: "Sort", sort_status: "Status", sort_name: "Name", sort_ip: "IP",
+    asc: "Ascending", desc: "Descending", none: "No device to show.",
+    warn_ip: "IP filter configured but no device exposes the \"{attr}\" attribute. Check the attribute name in Developer Tools → States.",
+    devices: "devices",
+    description: "Connected devices: manual list and/or discovery by IP range.",
+    expand_all: "Expand all", collapse_all: "Collapse all",
+    sec_general: "General", sec_colors: "Colors", sec_devices: "Listed devices",
+    sec_auto: "Automatic discovery", c_accent: "Accent", c_home: "Connected",
+    hint_devices: "Manual list, shown first. Traffic is optional.",
+    add_device: "Add a device",
+    hint_auto: "Adds every <code>device_tracker</code> not already listed, filtered by IP range.",
+    ranges: "IP ranges (one per line)", formats: "Accepted formats:",
+    ranges_empty: "Leave empty to not filter on any range.",
+    no_device: "No device listed.", device_n: "Device #",
+    opt_status: "Connected first", opt_name: "Name", opt_ip: "IP address",
+  },
+};
+// Falls back to the <html lang> HA sets when hass is not available yet (setConfig, card picker).
+const uclLocale = (hass) =>
+  hass?.locale?.language || hass?.language || document.documentElement.lang || "en";
+const uclLang = (hass) => (String(uclLocale(hass)).toLowerCase().startsWith("fr") ? "fr" : "en");
+const uclT = (hass, key) => UCL_I18N[uclLang(hass)][key] ?? UCL_I18N.en[key] ?? key;
+// Number locale used by the formatting helpers; set from hass (one hass per page).
+let uclLoc = uclLocale(null);
+
+/* ---------- Collapsible editor sections ---------- */
+// Open/closed state, kept at module level so it survives editor re-renders and re-openings.
+const UCL_SEC_OPEN = new Map();
+/* Turns every `.sec[data-sid]` of `root` into a collapsible section (first one open by
+   default) and adds an "expand all / collapse all" control before the first section.
+   Content is only hidden, never rebuilt, so fields keep their focus and value. */
+function uclCollapsible(root, tag, t) {
+  const secs = Array.from(root.querySelectorAll(".sec[data-sid]"));
+  if (!secs.length) return { open() {} };
+  const items = secs.map((sec, i) => {
+    const key = tag + ":" + sec.dataset.sid;
+    if (!UCL_SEC_OPEN.has(key)) UCL_SEC_OPEN.set(key, i === 0);
+    const head = sec.querySelector(".sec-head");
+    const body = document.createElement("div");
+    body.className = "sec-body";
+    body.id = "sec-body-" + sec.dataset.sid;
+    while (head.nextSibling) body.appendChild(head.nextSibling);
+    sec.appendChild(body);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sec-toggle";
+    btn.setAttribute("aria-controls", body.id);
+    btn.innerHTML = '<ha-icon class="sec-chev" icon="mdi:chevron-right"></ha-icon>';
+    const title = head.querySelector(".sec-title");
+    head.insertBefore(btn, title);
+    btn.appendChild(title);
+    return { key, sec, body, btn };
+  });
+  const all = document.createElement("button");
+  all.type = "button";
+  all.className = "sec-all";
+  secs[0].parentNode.insertBefore(all, secs[0]);
+  const anyClosed = () => items.some((it) => !UCL_SEC_OPEN.get(it.key));
+  const sync = () => {
+    items.forEach((it) => {
+      const open = UCL_SEC_OPEN.get(it.key);
+      it.body.hidden = !open;
+      it.btn.setAttribute("aria-expanded", String(open));
+      it.sec.classList.toggle("open", open);
+    });
+    all.textContent = t(anyClosed() ? "expand_all" : "collapse_all");
+  };
+  items.forEach((it) => it.btn.addEventListener("click", () => {
+    UCL_SEC_OPEN.set(it.key, !UCL_SEC_OPEN.get(it.key));
+    sync();
+  }));
+  all.addEventListener("click", () => {
+    const open = anyClosed();
+    items.forEach((it) => UCL_SEC_OPEN.set(it.key, open));
+    sync();
+  });
+  sync();
+  return { open(id) { UCL_SEC_OPEN.set(tag + ":" + id, true); sync(); } };
+}
+const UCL_SEC_CSS = `
+  .sec-toggle { flex:1; min-width:0; display:flex; align-items:center; gap:6px; margin:0; padding:2px 0;
+    background:none; border:none; border-radius:4px; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .sec-toggle:focus-visible, .sec-all:focus-visible { outline:2px solid var(--primary-color); outline-offset:2px; }
+  .sec-chev { --mdc-icon-size:20px; flex-shrink:0; color:var(--secondary-text-color); transition:transform .2s ease; }
+  .sec.open .sec-chev { transform:rotate(90deg); }
+  .sec:not(.open) .sec-head { margin-bottom:0; }
+  .sec-body[hidden] { display:none !important; }
+  .sec-all { display:block; margin:0 0 10px auto; padding:2px 6px; background:none; border:none;
+    border-radius:4px; font:inherit; font-size:12px; color:var(--secondary-text-color); cursor:pointer; }
+  .sec-all:hover { color:var(--primary-text-color); }
+  @media (prefers-reduced-motion: reduce) { .sec-chev { transition:none; } }
+`;
 
 const cRgba = (c, a) => {
   if (!c || c.indexOf("var(") === 0 || c.indexOf("rgb") === 0) return c;
@@ -27,9 +144,10 @@ const cRgba = (c, a) => {
 };
 const cFmt = (st, d) => {
   if (!st) return null;
+  if (st.state === "unavailable" || st.state === "unknown") return "—";
   const n = parseFloat(st.state);
   if (isNaN(n)) return st.state;
-  return n.toLocaleString("fr-FR", { maximumFractionDigits: d === undefined ? 1 : d });
+  return n.toLocaleString(uclLoc, { maximumFractionDigits: d === undefined ? 1 : d });
 };
 const cUnit = (st) => (st && st.attributes ? st.attributes.unit_of_measurement || "" : "");
 const cEsc = (s) => String(s).replace(/[&<>"']/g, (ch) =>
@@ -99,7 +217,8 @@ class UnifiClientsCard extends HTMLElement {
   setConfig(config) {
     const auto = config.auto || {};
     this._config = {
-      title: config.title || "Équipements",
+      // null = translated default, resolved at render time (hass not known yet)
+      title: config.title || null,
       icon: config.icon || "mdi:devices",
       accent: config.accent || "#BA7517",
       color_home: config.color_home || "#1D9E75",
@@ -118,6 +237,7 @@ class UnifiClientsCard extends HTMLElement {
         ip_attribute: auto.ip_attribute || "ip",
         require_ip: auto.require_ip !== false,
         entity_prefix: auto.entity_prefix || "",
+        platform: auto.platform || "", // "" = every device_tracker (historical behavior)
         exclude: auto.exclude || [],
       },
     };
@@ -131,6 +251,7 @@ class UnifiClientsCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    uclLoc = uclLocale(hass);
     if (!this._built) { this._build(); this._built = true; }
     const sig = this._sig(hass);
     if (sig !== this._last) { this._last = sig; this._render(); }
@@ -158,6 +279,10 @@ class UnifiClientsCard extends HTMLElement {
         if (seen[id]) return;
         if (c.auto.entity_prefix && id.indexOf("device_tracker." + c.auto.entity_prefix) !== 0) return;
         if (ex.indexOf(id) !== -1) return;
+        if (c.auto.platform) {
+          const reg = hass.entities && hass.entities[id];
+          if (!reg || reg.platform !== c.auto.platform) return;
+        }
 
         if (this._ranges.length) {
           const st = hass.states[id];
@@ -188,6 +313,7 @@ class UnifiClientsCard extends HTMLElement {
   }
 
   _build() {
+    const t = (k) => uclT(this._hass, k);
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
@@ -254,15 +380,15 @@ class UnifiClientsCard extends HTMLElement {
           <div><div class="htitle"></div><div class="hsub"></div></div>
         </div>
         <div class="tabs hidden">
-          <div class="tab t-all" data-f="all">Tous</div>
-          <div class="tab t-home" data-f="home">Connectés</div>
-          <div class="tab t-away" data-f="away">Absents</div>
+          <div class="tab t-all" data-f="all">${t("tab_all")}</div>
+          <div class="tab t-home" data-f="home">${t("tab_home")}</div>
+          <div class="tab t-away" data-f="away">${t("tab_away")}</div>
         </div>
         <div class="sortbar hidden">
-          <span class="lbl">Trier</span>
-          <span class="sb s-status" data-s="status">État</span>
-          <span class="sb s-name" data-s="name">Nom</span>
-          <span class="sb s-ip" data-s="ip">IP</span>
+          <span class="lbl">${t("sort")}</span>
+          <span class="sb s-status" data-s="status">${t("sort_status")}</span>
+          <span class="sb s-name" data-s="name">${t("sort_name")}</span>
+          <span class="sb s-ip" data-s="ip">${t("sort_ip")}</span>
           <span class="dirbtn"><ha-icon></ha-icon><span class="dirtxt"></span></span>
         </div>
         <div class="list"></div>
@@ -302,7 +428,9 @@ class UnifiClientsCard extends HTMLElement {
     const ic = disc.querySelector("ha-icon");
     ic.setAttribute("icon", c.icon);
     ic.style.color = c.accent;
-    r.querySelector(".htitle").textContent = c.title;
+    const t = (k) => uclT(hass, k);
+    const plural = (n, k) => t(k + "_" + (new Intl.PluralRules(uclLoc).select(n) === "one" ? "one" : "other"));
+    r.querySelector(".htitle").textContent = c.title || t("title");
 
     let items = this._collect();
 
@@ -320,8 +448,8 @@ class UnifiClientsCard extends HTMLElement {
     const nHome = items.filter((d) => d.home).length;
     const nAway = items.length - nHome;
     r.querySelector(".hsub").innerHTML =
-      '<b style="color:' + c.color_home + '">' + nHome + " connecté" + (nHome > 1 ? "s" : "") + "</b>" +
-      (nAway ? " · " + nAway + " absent" + (nAway > 1 ? "s" : "") : "");
+      '<b style="color:' + c.color_home + '">' + nHome + " " + plural(nHome, "home") + "</b>" +
+      (nAway ? " · " + nAway + " " + plural(nAway, "away") : "");
 
     /* Onglets */
     const tabs = r.querySelector(".tabs");
@@ -351,28 +479,29 @@ class UnifiClientsCard extends HTMLElement {
       const asc = this._dir === "asc";
       db.querySelector("ha-icon").setAttribute("icon",
         asc ? "mdi:sort-ascending" : "mdi:sort-descending");
-      db.querySelector(".dirtxt").textContent = asc ? "Croissant" : "Décroissant";
+      db.querySelector(".dirtxt").textContent = t(asc ? "asc" : "desc");
     }
 
     /* Tri — l'IP est comparée numériquement (1, 2, 3… 10, 11), jamais en texte */
     const dir = this._dir === "desc" ? -1 : 1;
+    const loc = uclLoc;
     if (this._sort === "name") {
-      items.sort((a, b) => dir * a.label.localeCompare(b.label, "fr", { numeric: true }));
+      items.sort((a, b) => dir * a.label.localeCompare(b.label, loc, { numeric: true }));
     } else if (this._sort === "ip") {
       items.sort((a, b) => {
         const av = ipToLong(a.ip);
         const bv = ipToLong(b.ip);
         // Les appareils sans IP exploitable finissent toujours en bas
-        if (av === null && bv === null) return a.label.localeCompare(b.label, "fr");
+        if (av === null && bv === null) return a.label.localeCompare(b.label, loc);
         if (av === null) return 1;
         if (bv === null) return -1;
-        if (av === bv) return a.label.localeCompare(b.label, "fr");
+        if (av === bv) return a.label.localeCompare(b.label, loc);
         return dir * (av - bv);
       });
     } else {
       items.sort((a, b) => {
         if (a.home !== b.home) return dir * (a.home ? -1 : 1);
-        return a.label.localeCompare(b.label, "fr", { numeric: true });
+        return a.label.localeCompare(b.label, loc, { numeric: true });
       });
     }
 
@@ -383,7 +512,7 @@ class UnifiClientsCard extends HTMLElement {
     if (!items.length) {
       const e = document.createElement("div");
       e.className = "more";
-      e.textContent = "Aucun appareil à afficher.";
+      e.textContent = t("none");
       list.appendChild(e);
     }
 
@@ -393,8 +522,7 @@ class UnifiClientsCard extends HTMLElement {
       if (!anyIp) {
         const w = document.createElement("div");
         w.className = "warn";
-        w.textContent = "Filtre IP configuré mais aucun appareil n'expose l'attribut « " +
-          c.auto.ip_attribute + " ». Vérifie le nom de l'attribut dans Developer Tools → States.";
+        w.textContent = t("warn_ip").replace("{attr}", c.auto.ip_attribute);
         list.appendChild(w);
       }
     }
@@ -420,7 +548,7 @@ class UnifiClientsCard extends HTMLElement {
         if (txSt) right += '<span class="dtraf" style="color:' + c.color_tx + '">↑ ' +
           cFmt(txSt) + " " + cEsc(cUnit(txSt)) + "</span>";
       } else if (!d.home) {
-        right = '<span class="dstat">absent</span>';
+        right = '<span class="dstat">' + t("away") + "</span>";
       }
 
       el.innerHTML =
@@ -480,7 +608,7 @@ class UnifiClientsCard extends HTMLElement {
 
     const info = document.createElement("span");
     info.className = "pginfo";
-    info.textContent = total + " appareils";
+    info.textContent = total + " " + uclT(this._hass, "devices");
     pager.appendChild(info);
   }
 
@@ -494,8 +622,13 @@ class UnifiClientsCard extends HTMLElement {
   getCardSize() {
     return 2 + Math.min(this._config.max_items, 10);
   }
-  static getStubConfig() {
-    return { type: "custom:unifi-clients-card", title: "Équipements" };
+  /* With the UniFi integration present, starts with discovery of its trackers only */
+  static getStubConfig(hass) {
+    const stub = { type: "custom:unifi-clients-card", title: uclT(hass, "title") };
+    const unifi = Object.values(hass?.entities || {}).some(
+      (e) => e.platform === "unifi" && e.entity_id.startsWith("device_tracker."));
+    if (unifi) stub.auto = { enabled: true, platform: "unifi" };
+    return stub;
   }
   static getConfigElement() { return document.createElement("unifi-clients-card-editor"); }
 }
@@ -503,17 +636,28 @@ customElements.define("unifi-clients-card", UnifiClientsCard);
 
 /* ================= ÉDITEUR ================= */
 const UCL_L = {
-  title: "Titre", icon: "Icône", show_filters: "Afficher les onglets de filtre",
-  max_items: "Appareils par page", sort: "Tri par défaut",
-  sort_dir: "Sens par défaut", show_sort: "Afficher la barre de tri",
-  entity: "Entité de présence", name: "Nom affiché", rx: "Réception", tx: "Émission",
-  enabled: "Activer la découverte automatique",
-  ip_attribute: "Nom de l'attribut IP",
-  require_ip: "Exclure les appareils sans IP",
-  entity_prefix: "Préfixe d'entité (optionnel)",
-  ranges_text: "Plages IP (une par ligne)",
+  fr: {
+    title: "Titre", icon: "Icône", show_filters: "Afficher les onglets de filtre",
+    max_items: "Appareils par page", sort: "Tri par défaut",
+    sort_dir: "Sens par défaut", show_sort: "Afficher la barre de tri",
+    entity: "Entité de présence", name: "Nom affiché", rx: "Réception", tx: "Émission",
+    ip_attribute: "Nom de l'attribut IP",
+    require_ip: "Exclure les appareils sans IP",
+    entity_prefix: "Préfixe d'entité (optionnel)",
+    platform: "Intégration (optionnel, ex. unifi)",
+  },
+  en: {
+    title: "Title", icon: "Icon", show_filters: "Show the filter tabs",
+    max_items: "Devices per page", sort: "Default sort",
+    sort_dir: "Default direction", show_sort: "Show the sort bar",
+    entity: "Presence entity", name: "Display name", rx: "Receive (RX)", tx: "Transmit (TX)",
+    ip_attribute: "IP attribute name",
+    require_ip: "Exclude devices without IP",
+    entity_prefix: "Entity prefix (optional)",
+    platform: "Integration (optional, e.g. unifi)",
+  },
 };
-const UCL_S_GEN = [
+const uclSchemaGen = (t) => [
   { type: "grid", schema: [
     { name: "title", selector: { text: {} } },
     { name: "icon", selector: { icon: {} } },
@@ -521,9 +665,9 @@ const UCL_S_GEN = [
   { type: "grid", schema: [
     { name: "max_items", selector: { number: { min: 1, max: 100, mode: "box" } } },
     { name: "sort", selector: { select: { mode: "dropdown", options: [
-      { value: "status", label: "Connectés d'abord" },
-      { value: "name", label: "Nom" },
-      { value: "ip", label: "Adresse IP" },
+      { value: "status", label: t("opt_status") },
+      { value: "name", label: t("opt_name") },
+      { value: "ip", label: t("opt_ip") },
     ]}}},
   ]},
   { type: "grid", schema: [
@@ -531,13 +675,16 @@ const UCL_S_GEN = [
     { name: "show_sort", selector: { boolean: {} } },
   ]},
   { name: "sort_dir", selector: { select: { mode: "dropdown", options: [
-    { value: "asc", label: "Croissant" },
-    { value: "desc", label: "Décroissant" },
+    { value: "asc", label: t("asc") },
+    { value: "desc", label: t("desc") },
   ]}}},
 ];
 const UCL_S_AUTO = [
   { name: "ip_attribute", selector: { text: {} } },
-  { name: "entity_prefix", selector: { text: {} } },
+  { type: "grid", schema: [
+    { name: "entity_prefix", selector: { text: {} } },
+    { name: "platform", selector: { text: {} } },
+  ]},
   { name: "require_ip", selector: { boolean: {} } },
 ];
 const UCL_S_DEV = [
@@ -573,12 +720,16 @@ class UnifiClientsCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config: this._config }, bubbles: true, composed: true }));
   }
-  _label(s) { return UCL_L[s.name] || s.name; }
+  _t(k) { return uclT(this._hass, k); }
 
   _build() {
+    // Arrow function: ha-form calls computeLabel with itself as `this`
+    this._label = (s) => UCL_L[uclLang(this._hass)][s.name] || s.name;
+    const t = (k) => this._t(k);
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
+        ${UCL_SEC_CSS}
         .sec { margin-bottom:18px; }
         .sec-head { display:flex; align-items:center; gap:8px; margin-bottom:10px;
           padding-bottom:6px; border-bottom:1px solid var(--divider-color); }
@@ -613,35 +764,36 @@ class UnifiClientsCardEditor extends HTMLElement {
         .ta-help { font-size:11.5px; color:var(--secondary-text-color); margin-top:6px; line-height:1.5; }
         code { background:rgba(255,255,255,0.07); padding:1px 4px; border-radius:3px; font-size:11px; }
       </style>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Général</span></div>
+      <div class="sec" data-sid="general"><div class="sec-head"><span class="sec-title">${t("sec_general")}</span></div>
         <ha-form class="f-gen"></ha-form></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Couleurs</span></div>
+      <div class="sec" data-sid="colors"><div class="sec-head"><span class="sec-title">${t("sec_colors")}</span></div>
         <div class="colors">
-          <div class="color-field"><input type="color" class="c-accent"><label>Accent</label></div>
-          <div class="color-field"><input type="color" class="c-home"><label>Connecté</label></div>
+          <div class="color-field"><input type="color" class="c-accent"><label>${t("c_accent")}</label></div>
+          <div class="color-field"><input type="color" class="c-home"><label>${t("c_home")}</label></div>
         </div></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Appareils listés</span></div>
-        <div class="sec-hint">Liste manuelle, affichée en premier. Le trafic est optionnel.</div>
+      <div class="sec" data-sid="devices"><div class="sec-head"><span class="sec-title">${t("sec_devices")}</span></div>
+        <div class="sec-hint">${t("hint_devices")}</div>
         <div class="rows-dev"></div>
-        <div class="addbtn add-dev"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter un appareil</span></div></div>
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Découverte automatique</span>
+        <div class="addbtn add-dev"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add_device")}</span></div></div>
+      <div class="sec" data-sid="auto">
+        <div class="sec-head"><span class="sec-title">${t("sec_auto")}</span>
           <ha-switch class="sw-auto"></ha-switch></div>
-        <div class="sec-hint">Ajoute tous les <code>device_tracker</code> non déjà listés, filtrés par plage IP.</div>
+        <div class="sec-hint">${t("hint_auto")}</div>
         <div class="auto-body">
-          <label class="ta-lbl">Plages IP (une par ligne)</label>
+          <label class="ta-lbl">${t("ranges")}</label>
           <textarea class="ta-ranges" placeholder="192.168.1.0/24&#10;192.168.2.10-192.168.2.50&#10;10.0.0.*"></textarea>
-          <div class="ta-help">Formats acceptés : <code>192.168.1.0/24</code> · <code>192.168.1.10-192.168.1.50</code> · <code>192.168.1.10-50</code> · <code>192.168.1.*</code> · <code>192.168.1.42</code><br>
-            Laisse vide pour ne filtrer sur aucune plage.</div>
+          <div class="ta-help">${t("formats")} <code>192.168.1.0/24</code> · <code>192.168.1.10-192.168.1.50</code> · <code>192.168.1.10-50</code> · <code>192.168.1.*</code> · <code>192.168.1.42</code><br>
+            ${t("ranges_empty")}</div>
           <div style="height:12px"></div>
           <ha-form class="f-auto"></ha-form>
         </div>
       </div>
     `;
     const r = this.shadowRoot;
+    this._sections = uclCollapsible(r, "unifi-clients-card-editor", t);
 
     const fg = r.querySelector(".f-gen");
-    fg.schema = UCL_S_GEN; fg.computeLabel = this._label;
+    fg.schema = uclSchemaGen(t); fg.computeLabel = this._label;
     fg.addEventListener("value-changed", (e) => {
       e.stopPropagation();
       Object.assign(this._config, e.detail.value);
@@ -655,6 +807,7 @@ class UnifiClientsCardEditor extends HTMLElement {
       e.stopPropagation();
       this._config.auto = Object.assign({ enabled: true }, this._config.auto, e.detail.value);
       if (this._config.auto.entity_prefix === "") delete this._config.auto.entity_prefix;
+      if (this._config.auto.platform === "") delete this._config.auto.platform;
       this._emit();
     });
 
@@ -684,6 +837,7 @@ class UnifiClientsCardEditor extends HTMLElement {
       if (e.target.checked) {
         this._config.auto = Object.assign({ ip_attribute: "ip", require_ip: true },
           this._config.auto, { enabled: true });
+        this._sections.open("auto");
       } else {
         this._config.auto = Object.assign({}, this._config.auto, { enabled: false });
       }
@@ -728,6 +882,7 @@ class UnifiClientsCardEditor extends HTMLElement {
       fa.data = {
         ip_attribute: auto.ip_attribute || "ip",
         entity_prefix: auto.entity_prefix || "",
+        platform: auto.platform || "",
         require_ip: auto.require_ip !== false,
       };
     }
@@ -739,7 +894,7 @@ class UnifiClientsCardEditor extends HTMLElement {
       box.innerHTML = "";
       if (!list.length) {
         const e = document.createElement("div");
-        e.className = "empty"; e.textContent = "Aucun appareil listé.";
+        e.className = "empty"; e.textContent = this._t("no_device");
         box.appendChild(e);
       }
       list.forEach((it, i) => box.appendChild(this._row(it, i, list.length)));
@@ -758,7 +913,7 @@ class UnifiClientsCardEditor extends HTMLElement {
     head.className = "row-head";
     const num = document.createElement("span");
     num.className = "row-num";
-    num.textContent = item.name || item.entity || "Appareil #" + (index + 1);
+    num.textContent = item.name || item.entity || this._t("device_n") + (index + 1);
     head.appendChild(num);
     const mk = (icon, cls, fn, dis) => {
       const b = document.createElement("ha-icon-button");
@@ -803,7 +958,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "unifi-clients-card",
   name: "UniFi Clients Card",
-  description: "Équipements connectés : liste manuelle et/ou découverte par plage IP.",
+  description: uclT(null, "description"),
 });
 console.info("%c UNIFI-CLIENTS-CARD %c v" + UCL_VERSION + " ",
   "color:#fff;background:#BA7517;font-weight:700", "color:#BA7517;background:#222");
@@ -832,6 +987,6 @@ auto:
     - 192.168.1.0/24
     - 192.168.2.10-192.168.2.50
   exclude:
-    - device_tracker.ucg_max
-    - device_tracker.u7_pro
+    - device_tracker.example_gateway
+    - device_tracker.example_access_point
 ============================================================ */

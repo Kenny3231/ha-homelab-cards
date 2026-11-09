@@ -34,6 +34,12 @@
             "data": {
               "cards": "Cards"
             }
+          },
+          "containers": {
+            "name": "Containers",
+            "data": {
+              "cards": "Cards"
+            }
           }
         }
       }
@@ -74,6 +80,12 @@
           },
           "home": {
             "name": "Home",
+            "data": {
+              "cards": "Cards"
+            }
+          },
+          "containers": {
+            "name": "Containers",
             "data": {
               "cards": "Cards"
             }

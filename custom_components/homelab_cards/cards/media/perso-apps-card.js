@@ -1,12 +1,77 @@
 /**
  * perso-apps-card.js
- * Grille de lancement d'applications pour une entité remote (Android TV / Shield).
+ * App launcher grid for a remote entity (e.g. Android TV Remote).
+ * Logos are user-provided (e.g. /local/apps/<name>.webp); tiles without a
+ * working image fall back to the app icon or its initial.
  *
- * Auteur : Kenny3231
- * Version : 1.0.0
+ * Version : 1.1.0
  */
 
 const PAC_VERSION = "1.1.0";
+
+/* UI strings. Language follows the HA UI language (fr* -> French, else English). */
+const PAC_I18N = {
+  en: {
+    err_empty: "perso-apps-card: empty configuration.",
+    err_apps: "perso-apps-card: 'apps' must be a list.",
+    err_app: "perso-apps-card: each app must define 'activity', 'package' or 'action'.",
+    err_entity: "perso-apps-card: 'entity' (remote domain) is required as soon as an app uses 'activity' or 'package'.",
+    no_apps: "No application yet. Add some in the card editor.",
+    card_name: "Perso — Apps",
+    card_desc: "App launcher grid for a remote entity.",
+    expand_all: "Expand all",
+    collapse_all: "Collapse all",
+    sec_general: "General",
+    sec_display: "Display",
+    sec_apps: "Applications",
+    add_app: "+ Add an application",
+    f_name: "Name",
+    f_image: "Image (/local/apps/...)",
+    f_icon: "Fallback icon (mdi:...)",
+    f_activity: "Activity / package",
+    labels: {
+      entity: "Remote entity",
+      title: "Title (leave empty to hide)",
+      columns: "Columns",
+      radius: "Corner radius (px)",
+      state_entity: "Player used to highlight the active app (optional)",
+      show_labels: "Show names under tiles",
+    },
+  },
+  fr: {
+    err_empty: "perso-apps-card : configuration vide.",
+    err_apps: "perso-apps-card : 'apps' doit être une liste.",
+    err_app: "perso-apps-card : chaque app doit définir 'activity', 'package' ou 'action'.",
+    err_entity: "perso-apps-card : 'entity' (domaine remote) est obligatoire dès qu'une app utilise 'activity' ou 'package'.",
+    no_apps: "Aucune application. Ajoutez-en dans l'éditeur de la carte.",
+    card_name: "Perso — Applications",
+    card_desc: "Grille de lancement d'applications pour une entité remote.",
+    expand_all: "Tout déplier",
+    collapse_all: "Tout replier",
+    sec_general: "Général",
+    sec_display: "Affichage",
+    sec_apps: "Applications",
+    add_app: "+ Ajouter une application",
+    f_name: "Nom",
+    f_image: "Image (/local/apps/...)",
+    f_icon: "Icône de repli (mdi:...)",
+    f_activity: "Activity / package",
+    labels: {
+      entity: "Entité remote",
+      title: "Titre (laisser vide pour masquer)",
+      columns: "Colonnes",
+      radius: "Arrondi (px)",
+      state_entity: "Lecteur pour surligner l'app active (optionnel)",
+      show_labels: "Afficher les noms sous les tuiles",
+    },
+  },
+};
+
+// Without hass (setConfig before first hass, module load) fall back to the page language.
+function pacT(hass) {
+  const l = (hass && (hass.locale?.language || hass.language)) || document.documentElement.lang || "en";
+  return PAC_I18N[String(l).toLowerCase().startsWith("fr") ? "fr" : "en"];
+}
 
 const PAC_DEFAULTS = {
   columns: 4,
@@ -39,35 +104,33 @@ class PersoAppsCard extends HTMLElement {
     return document.createElement("perso-apps-card-editor");
   }
 
+  /* No app is assumed: the grid starts empty and is filled in the editor */
   static getStubConfig(hass) {
-    const remote = Object.keys(hass.states).find((e) => e.startsWith("remote."));
+    const ids = Object.keys(hass.states);
+    const ents = hass.entities || {};
+    const remote =
+      ids.find((e) => e.startsWith("remote.") && ents[e]?.platform === "androidtv_remote") ||
+      ids.find((e) => e.startsWith("remote."));
     return {
       type: "custom:perso-apps-card",
       entity: remote || "remote.example",
       columns: 4,
-      apps: [
-        { name: "Netflix", image: "/local/apps/netflix.webp", activity: "https://www.netflix.com/title" },
-      ],
+      apps: [],
     };
   }
 
   setConfig(config) {
-    if (!config) throw new Error("perso-apps-card : configuration vide.");
-    if (!Array.isArray(config.apps) || config.apps.length === 0) {
-      throw new Error("perso-apps-card : la liste 'apps' est obligatoire et ne peut pas être vide.");
+    const t = pacT(this._hass);
+    if (!config) throw new Error(t.err_empty);
+    // An empty list is accepted (empty-state hint) so the card can be added from the picker
+    const apps = config.apps === undefined ? [] : config.apps;
+    if (!Array.isArray(apps)) throw new Error(t.err_apps);
+    const bad = apps.find((a) => !a || (!a.activity && !a.package && !a.action));
+    if (bad) throw new Error(t.err_app);
+    if (!config.entity && apps.some((a) => a.activity || a.package)) {
+      throw new Error(t.err_entity);
     }
-    const bad = config.apps.find((a) => !a || (!a.activity && !a.package && !a.action));
-    if (bad) {
-      throw new Error(
-        "perso-apps-card : chaque app doit définir 'activity', 'package' ou 'action'."
-      );
-    }
-    if (!config.entity && config.apps.some((a) => a.activity || a.package)) {
-      throw new Error(
-        "perso-apps-card : 'entity' (domaine remote) est obligatoire dès qu'une app utilise 'activity' ou 'package'."
-      );
-    }
-    this._config = Object.assign({}, PAC_DEFAULTS, config);
+    this._config = Object.assign({}, PAC_DEFAULTS, config, { apps });
     this._built = false;
     this._sigCache = null;
     if (this.shadowRoot) this.shadowRoot.innerHTML = "";
@@ -75,7 +138,7 @@ class PersoAppsCard extends HTMLElement {
 
   getCardSize() {
     const cols = this._config.columns || 4;
-    return Math.ceil(this._config.apps.length / cols) * 2 + (this._config.title ? 1 : 0);
+    return Math.max(1, Math.ceil(this._config.apps.length / cols) * 2 + (this._config.title ? 1 : 0));
   }
 
   getGridOptions() {
@@ -151,7 +214,9 @@ class PersoAppsCard extends HTMLElement {
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
-    return hay.includes(needle) || needle.includes(hay);
+    // Reverse match only against app_id: a short generic state ("on") would match any needle
+    const appId = String(st.attributes.app_id || "").toLowerCase();
+    return hay.includes(needle) || (!!appId && needle.includes(appId));
   }
 
   /* -------------------------------------------------------------- */
@@ -185,6 +250,13 @@ class PersoAppsCard extends HTMLElement {
     grid.style.gridTemplateColumns = `repeat(${c.columns}, minmax(0, 1fr))`;
     body.appendChild(grid);
 
+    if (!c.apps.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = pacT(this._hass).no_apps;
+      body.appendChild(empty);
+    }
+
     this._tiles = [];
     c.apps.forEach((app) => {
       const wrap = document.createElement("div");
@@ -195,11 +267,29 @@ class PersoAppsCard extends HTMLElement {
       tile.className = "tile";
       tile.style.borderRadius = c.radius + "px";
       tile.title = app.name || "";
+      if (app.name) tile.setAttribute("aria-label", app.name);
 
+      // Missing/broken image: optional icon, else the name's initial (+ short name), else a generic icon
       const mkFallback = () => {
         const fb = document.createElement("span");
         fb.className = "fallback";
-        fb.textContent = (app.name || "?").slice(0, 10);
+        const name = String(app.name || "").trim();
+        if (app.icon || !name) {
+          const ic = document.createElement("ha-icon");
+          ic.setAttribute("icon", app.icon || "mdi:application-outline");
+          fb.appendChild(ic);
+        } else {
+          const ini = document.createElement("span");
+          ini.className = "ini";
+          ini.textContent = Array.from(name)[0].toUpperCase();
+          fb.appendChild(ini);
+        }
+        if (name && !c.show_labels) {
+          const nm = document.createElement("span");
+          nm.className = "nm";
+          nm.textContent = name;
+          fb.appendChild(nm);
+        }
         return fb;
       };
 
@@ -290,10 +380,20 @@ ha-card.pac.unavailable { opacity: .45; pointer-events: none; }
   display: block;
 }
 .tile .fallback {
-  display: grid; place-items: center;
-  width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: 100%; height: 100%; box-sizing: border-box;
   font-size: 11px; font-weight: 700; color: #dfe4ec;
   padding: 4px; text-align: center; line-height: 1.15;
+}
+.tile .fallback .ini { font-size: 22px; line-height: 1; }
+.tile .fallback ha-icon { --mdc-icon-size: 26px; }
+.tile .fallback .nm {
+  max-width: 100%; font-size: 10px; font-weight: 600; opacity: .8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.empty {
+  font-size: 12px; font-style: italic;
+  color: var(--secondary-text-color, #9aa0ab);
 }
 .tile:active { transform: scale(.94); }
 .tile.active {
@@ -316,6 +416,88 @@ ha-card.pac.unavailable { opacity: .45; pointer-events: none; }
 /* Éditeur                                                             */
 /* ------------------------------------------------------------------ */
 
+/* Collapsible editor sections. Open/closed state survives editor re-creation
+   (module-level Map keyed `${tag}:${sectionId}`); only `hidden` is toggled so
+   form fields, their values and focus are never touched. */
+const PAC_SECTIONS = new Map();
+let pacSecSeq = 0;
+
+const PAC_SEC_CSS = `
+  .pac-sec { margin-bottom: 14px; }
+  .pac-sec-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--divider-color);
+  }
+  .pac-sec-toggle {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+    background: none; border: none; padding: 2px 0; margin: 0; border-radius: 4px;
+    font: inherit; font-size: 15px; font-weight: 600; color: var(--primary-text-color);
+    text-align: left; cursor: pointer;
+  }
+  .pac-chev { --mdc-icon-size: 20px; color: var(--secondary-text-color); transition: transform .2s ease; flex-shrink: 0; }
+  .pac-sec-toggle[aria-expanded="true"] .pac-chev { transform: rotate(90deg); }
+  .pac-sec-allbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  .pac-sec-all {
+    background: none; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;
+    font: inherit; font-size: 12px; color: var(--secondary-text-color);
+  }
+  .pac-sec-all:hover { color: var(--primary-text-color); }
+  .pac-sec-toggle:focus-visible, .pac-sec-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .pac-sec-body[hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .pac-chev { transition: none; } }
+`;
+
+function pacSection(id, title) {
+  const sec = document.createElement("div");
+  sec.className = "pac-sec";
+  sec.dataset.sec = id;
+  sec.innerHTML =
+    '<div class="pac-sec-head"><button type="button" class="pac-sec-toggle">' +
+    '<ha-icon class="pac-chev" icon="mdi:chevron-right"></ha-icon><span></span></button></div>' +
+    '<div class="pac-sec-body"></div>';
+  sec.querySelector(".pac-sec-toggle span").textContent = title;
+  return sec;
+}
+
+function pacWireSections(root, tag, t) {
+  const secs = Array.from(root.querySelectorAll(".pac-sec[data-sec]"));
+  const all = root.querySelector(".pac-sec-all");
+  const uid = "pacsec" + ++pacSecSeq;
+  const sync = () => {
+    if (all) all.textContent = secs.some((s) => s.hasAttribute("data-closed")) ? t.expand_all : t.collapse_all;
+  };
+  const set = (s, open) => {
+    PAC_SECTIONS.set(tag + ":" + s.dataset.sec, open);
+    s.toggleAttribute("data-closed", !open);
+    s.querySelector(".pac-sec-toggle").setAttribute("aria-expanded", String(open));
+    s.querySelector(".pac-sec-body").hidden = !open;
+  };
+  secs.forEach((s, i) => {
+    const btn = s.querySelector(".pac-sec-toggle");
+    const body = s.querySelector(".pac-sec-body");
+    btn.id = uid + "-" + s.dataset.sec + "-h";
+    body.id = uid + "-" + s.dataset.sec + "-b";
+    btn.setAttribute("aria-controls", body.id);
+    body.setAttribute("role", "region");
+    body.setAttribute("aria-labelledby", btn.id);
+    const saved = PAC_SECTIONS.get(tag + ":" + s.dataset.sec);
+    set(s, saved === undefined ? i === 0 : saved);
+    btn.addEventListener("click", () => {
+      set(s, s.hasAttribute("data-closed"));
+      sync();
+    });
+  });
+  if (all) {
+    all.addEventListener("click", () => {
+      const open = secs.some((s) => s.hasAttribute("data-closed"));
+      secs.forEach((s) => set(s, open));
+      sync();
+    });
+  }
+  sync();
+}
+
 class PersoAppsCardEditor extends HTMLElement {
   constructor() {
     super();
@@ -323,28 +505,39 @@ class PersoAppsCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
+    // HA echoes back the config we just emitted: rebuilding the rows would steal focus mid-typing
+    if (this._built && JSON.stringify(config) === this._lastEmitted) return;
     this._config = JSON.parse(JSON.stringify(config || {}));
     if (!Array.isArray(this._config.apps)) this._config.apps = [];
-    if (!this._built) this._build();
-    this._fill();
+    if (this._built) this._fill();
+    else this._ensureBuilt();
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this._topForm) this._topForm.hass = hass;
+    if (this._forms) this._forms.forEach((f) => (f.hass = hass));
+    else this._ensureBuilt();
+  }
+
+  /* Built once both config and hass are known (labels depend on the UI language) */
+  _ensureBuilt() {
+    if (this._built || !this._config || !this._hass) return;
+    this._build();
+    this._fill();
   }
 
   _emit() {
     const cfg = JSON.parse(JSON.stringify(this._config));
     cfg.apps = cfg.apps.map((a) => {
       const o = {};
-      ["name", "image", "activity", "package", "match", "background", "action"].forEach((k) => {
+      ["name", "image", "icon", "activity", "package", "match", "background", "action"].forEach((k) => {
         if (a[k]) o[k] = a[k];
       });
       if (a.data) o.data = a.data;
       if (a.target) o.target = a.target;
       return o;
     });
+    this._lastEmitted = JSON.stringify(cfg);
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: cfg },
@@ -354,10 +547,19 @@ class PersoAppsCardEditor extends HTMLElement {
     );
   }
 
-  _topSchema() {
+  _generalSchema() {
     return [
       { name: "entity", selector: { entity: { filter: { domain: ["remote"] } } } },
       { name: "title", selector: { text: {} } },
+      {
+        name: "state_entity",
+        selector: { entity: { filter: { domain: ["media_player"] } } },
+      },
+    ];
+  }
+
+  _displaySchema() {
+    return [
       {
         type: "grid",
         name: "",
@@ -366,33 +568,21 @@ class PersoAppsCardEditor extends HTMLElement {
           { name: "radius", selector: { number: { min: 0, max: 40, step: 1, mode: "box" } } },
         ],
       },
-      {
-        name: "state_entity",
-        selector: { entity: { filter: { domain: ["media_player"] } } },
-      },
       { name: "show_labels", selector: { boolean: {} } },
     ];
   }
 
   _label(schema) {
-    const map = {
-      entity: "Entité remote",
-      title: "Titre (laisser vide pour masquer)",
-      columns: "Colonnes",
-      radius: "Arrondi (px)",
-      state_entity: "Lecteur pour surligner l'app active (optionnel)",
-      show_labels: "Afficher les noms sous les tuiles",
-    };
-    return map[schema.name] || schema.name;
+    return pacT(this._hass).labels[schema.name] || schema.name;
   }
 
   _build() {
+    const t = pacT(this._hass);
     this.innerHTML = "";
 
     const style = document.createElement("style");
     style.textContent = `
       .pac-ed-apps { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
-      .pac-ed-h { font-size: 13px; font-weight: 500; color: var(--primary-text-color); }
       .pac-ed-row {
         border: 1px solid var(--divider-color); border-radius: 10px;
         padding: 10px; display: flex; flex-direction: column; gap: 8px;
@@ -409,49 +599,78 @@ class PersoAppsCardEditor extends HTMLElement {
       }
       .pac-ed-idx { font-size: 12px; color: var(--secondary-text-color); min-width: 18px; }
     `;
+    style.textContent += PAC_SEC_CSS;
     this.appendChild(style);
 
-    this._topForm = document.createElement("ha-form");
-    this._topForm.computeLabel = (s) => this._label(s);
-    this._topForm.addEventListener("value-changed", (ev) => {
-      ev.stopPropagation();
-      const v = Object.assign({}, ev.detail.value);
-      Object.keys(v).forEach((k) => {
-        if (v[k] === "" || v[k] === undefined) delete v[k];
-      });
-      const apps = this._config.apps;
-      this._config = Object.assign({}, v, { apps });
-      this._emit();
-    });
-    if (this._hass) this._topForm.hass = this._hass;
-    this.appendChild(this._topForm);
+    const bar = document.createElement("div");
+    bar.className = "pac-sec-allbar";
+    bar.innerHTML = '<button type="button" class="pac-sec-all"></button>';
+    this.appendChild(bar);
 
+    // General + display forms both carry every top-level key (ha-form emits data + change)
+    const mkTopForm = () => {
+      const f = document.createElement("ha-form");
+      f.computeLabel = (s) => this._label(s);
+      f.hass = this._hass;
+      f.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        const v = Object.assign({}, ev.detail.value);
+        Object.keys(v).forEach((k) => {
+          if (v[k] === "" || v[k] === undefined) delete v[k];
+        });
+        const apps = this._config.apps;
+        this._config = Object.assign({}, v, { type: this._config.type, apps });
+        this._fillTop();
+        this._emit();
+      });
+      return f;
+    };
+    this._generalForm = mkTopForm();
+    this._displayForm = mkTopForm();
+    this._forms = [this._generalForm, this._displayForm];
+
+    const general = pacSection("general", t.sec_general);
+    general.querySelector(".pac-sec-body").appendChild(this._generalForm);
+    this.appendChild(general);
+
+    const display = pacSection("display", t.sec_display);
+    display.querySelector(".pac-sec-body").appendChild(this._displayForm);
+    this.appendChild(display);
+
+    const appsSec = pacSection("apps", t.sec_apps);
+    const appsBody = appsSec.querySelector(".pac-sec-body");
     this._appsBox = document.createElement("div");
     this._appsBox.className = "pac-ed-apps";
-    this.appendChild(this._appsBox);
+    appsBody.appendChild(this._appsBox);
 
     const add = document.createElement("button");
     add.className = "pac-ed-add";
     add.type = "button";
-    add.textContent = "+ Ajouter une application";
+    add.textContent = t.add_app;
     add.addEventListener("click", () => {
       this._config.apps = this._config.apps.concat([{ name: "", image: "", activity: "" }]);
       this._fillApps();
       this._emit();
     });
-    this.appendChild(add);
+    appsBody.appendChild(add);
+    this.appendChild(appsSec);
 
+    pacWireSections(this, "perso-apps-card-editor", t);
     this._built = true;
   }
 
+  _fillTop() {
+    const top = Object.assign({}, this._config);
+    delete top.apps;
+    delete top.type;
+    this._generalForm.data = top;
+    this._generalForm.schema = this._generalSchema();
+    this._displayForm.data = top;
+    this._displayForm.schema = this._displaySchema();
+  }
+
   _fill() {
-    if (this._topForm) {
-      const top = Object.assign({}, this._config);
-      delete top.apps;
-      delete top.type;
-      this._topForm.data = top;
-      this._topForm.schema = this._topSchema();
-    }
+    this._fillTop();
     this._fillApps();
   }
 
@@ -475,11 +694,7 @@ class PersoAppsCardEditor extends HTMLElement {
   _fillApps() {
     if (!this._appsBox) return;
     this._appsBox.innerHTML = "";
-
-    const h = document.createElement("div");
-    h.className = "pac-ed-h";
-    h.textContent = "Applications";
-    this._appsBox.appendChild(h);
+    const tx = pacT(this._hass);
 
     this._config.apps.forEach((app, i) => {
       const row = document.createElement("div");
@@ -494,7 +709,7 @@ class PersoAppsCardEditor extends HTMLElement {
       line1.appendChild(idx);
 
       line1.appendChild(
-        this._mkField("Nom", app.name, (v) => {
+        this._mkField(tx.f_name, app.name, (v) => {
           this._config.apps[i].name = v;
           this._emit();
         })
@@ -545,8 +760,14 @@ class PersoAppsCardEditor extends HTMLElement {
       const line2 = document.createElement("div");
       line2.className = "pac-ed-line";
       line2.appendChild(
-        this._mkField("Image (/local/apps/...)", app.image, (v) => {
+        this._mkField(tx.f_image, app.image, (v) => {
           this._config.apps[i].image = v;
+          this._emit();
+        })
+      );
+      line2.appendChild(
+        this._mkField(tx.f_icon, app.icon, (v) => {
+          this._config.apps[i].icon = v;
           this._emit();
         })
       );
@@ -555,7 +776,7 @@ class PersoAppsCardEditor extends HTMLElement {
       const line3 = document.createElement("div");
       line3.className = "pac-ed-line";
       line3.appendChild(
-        this._mkField("Activity / package", app.activity || app.package, (v) => {
+        this._mkField(tx.f_activity, app.activity || app.package, (v) => {
           this._config.apps[i].activity = v;
           delete this._config.apps[i].package;
           this._emit();
@@ -580,8 +801,8 @@ if (!customElements.get("perso-apps-card-editor")) {
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "perso-apps-card",
-  name: "Perso — Applications",
-  description: "Grille de lancement d'applications pour une entité remote.",
+  name: pacT(null).card_name,
+  description: pacT(null).card_desc,
   preview: true,
 });
 

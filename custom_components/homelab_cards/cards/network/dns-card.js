@@ -2,12 +2,7 @@
  * DNS Status Card — custom Lovelace card (vanilla JS, zéro dépendance HACS)
  * Version 2 : sparkline historique + sections entièrement configurables
  *
- * Installation :
- *  1. Copier ce fichier dans  config/www/dns-card.js
- *  2. Settings → Dashboards → (menu ⋮) → Resources → Add resource
- *       URL : /local/dns-card.js
- *       Type : JavaScript Module
- *  3. Vider le cache navigateur (Ctrl+Shift+R)
+ * Loaded as a module by the homelab_cards integration.
  *
  * TOUTES les sections sont optionnelles : retire une clé du YAML, le bloc disparaît.
  * Voir le bloc EXEMPLE DE CONFIG en bas de fichier.
@@ -15,11 +10,150 @@
 
 const DNS_CARD_VERSION = "2.1.1";
 
+/* ---------- i18n ---------- */
+const DNS_I18N = {
+  fr: {
+    err_power: "La clé 'power_entity' est requise (switch de protection).",
+    state_on: "Protection active",
+    state_off: "Protection désactivée",
+    state_paused: "Désactivé (temporaire)",
+    of_total: "du total",
+    description: "Carte DNS configurable avec sparkline (Technitium, AdGuard, Pi-hole…).",
+    expand_all: "Tout déplier",
+    collapse_all: "Tout replier",
+    sec_general: "Général",
+    sec_colors: "Couleurs",
+    sec_appearance: "Textes et icônes",
+    sec_hero: "Bloc principal",
+    sec_panels: "Panneaux",
+    sec_secondary: "Stats secondaires",
+    sec_actions: "Actions",
+    c_on: "Protection active",
+    c_off: "Protection coupée",
+    hint_hero: "Grand chiffre avec courbe historique. Nécessite que le recorder conserve l'entité.",
+    hint_panels: "Maximum 2 recommandés (affichés côte à côte). Le dénominateur sert à calculer le pourcentage.",
+    hint_secondary: "Petite rangée en bas. 3 à 5 conseillés pour rester lisible sur mobile.",
+    hint_actions: "Boutons du bas. Le service est déduit du domaine (button → press, switch → toggle).",
+    add_panel: "Ajouter un panneau",
+    add_secondary: "Ajouter une stat",
+    add_action: "Ajouter une action",
+    empty: "Aucun élément. Utilise le bouton ci-dessous.",
+    color: "Couleur",
+    type_bar: "Barre de progression",
+    type_ring: "Anneau",
+  },
+  en: {
+    err_power: "The 'power_entity' key is required (protection switch).",
+    state_on: "Protection enabled",
+    state_off: "Protection disabled",
+    state_paused: "Disabled (temporary)",
+    of_total: "of total",
+    description: "Configurable DNS card with sparkline (Technitium, AdGuard, Pi-hole…).",
+    expand_all: "Expand all",
+    collapse_all: "Collapse all",
+    sec_general: "General",
+    sec_colors: "Colors",
+    sec_appearance: "Texts and icons",
+    sec_hero: "Main block",
+    sec_panels: "Panels",
+    sec_secondary: "Secondary stats",
+    sec_actions: "Actions",
+    c_on: "Protection enabled",
+    c_off: "Protection disabled",
+    hint_hero: "Big number with history curve. Requires the recorder to keep the entity.",
+    hint_panels: "2 at most recommended (shown side by side). The denominator is used to compute the percentage.",
+    hint_secondary: "Small row at the bottom. 3 to 5 recommended to stay readable on mobile.",
+    hint_actions: "Bottom buttons. The service is derived from the domain (button → press, switch → toggle).",
+    add_panel: "Add a panel",
+    add_secondary: "Add a stat",
+    add_action: "Add an action",
+    empty: "No item yet. Use the button below.",
+    color: "Color",
+    type_bar: "Progress bar",
+    type_ring: "Ring",
+  },
+};
+// Falls back to the <html lang> HA sets when hass is not available yet (setConfig, card picker).
+const dnsLocale = (hass) =>
+  hass?.locale?.language || hass?.language || document.documentElement.lang || "en";
+const dnsLang = (hass) => (String(dnsLocale(hass)).toLowerCase().startsWith("fr") ? "fr" : "en");
+const dnsT = (hass, key) => DNS_I18N[dnsLang(hass)][key] ?? DNS_I18N.en[key] ?? key;
+const dnsEsc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ---------- Collapsible editor sections ---------- */
+// Open/closed state, kept at module level so it survives editor re-renders and re-openings.
+const DNS_SEC_OPEN = new Map();
+/* Turns every `.sec[data-sid]` of `root` into a collapsible section (first one open by
+   default) and adds an "expand all / collapse all" control before the first section.
+   Content is only hidden, never rebuilt, so fields keep their focus and value. */
+function dnsCollapsible(root, tag, t) {
+  const secs = Array.from(root.querySelectorAll(".sec[data-sid]"));
+  if (!secs.length) return { open() {} };
+  const items = secs.map((sec, i) => {
+    const key = tag + ":" + sec.dataset.sid;
+    if (!DNS_SEC_OPEN.has(key)) DNS_SEC_OPEN.set(key, i === 0);
+    const head = sec.querySelector(".sec-head");
+    const body = document.createElement("div");
+    body.className = "sec-body";
+    body.id = "sec-body-" + sec.dataset.sid;
+    while (head.nextSibling) body.appendChild(head.nextSibling);
+    sec.appendChild(body);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sec-toggle";
+    btn.setAttribute("aria-controls", body.id);
+    btn.innerHTML = '<ha-icon class="sec-chev" icon="mdi:chevron-right"></ha-icon>';
+    const title = head.querySelector(".sec-title");
+    head.insertBefore(btn, title);
+    btn.appendChild(title);
+    return { key, sec, body, btn };
+  });
+  const all = document.createElement("button");
+  all.type = "button";
+  all.className = "sec-all";
+  secs[0].parentNode.insertBefore(all, secs[0]);
+  const anyClosed = () => items.some((it) => !DNS_SEC_OPEN.get(it.key));
+  const sync = () => {
+    items.forEach((it) => {
+      const open = DNS_SEC_OPEN.get(it.key);
+      it.body.hidden = !open;
+      it.btn.setAttribute("aria-expanded", String(open));
+      it.sec.classList.toggle("open", open);
+    });
+    all.textContent = t(anyClosed() ? "expand_all" : "collapse_all");
+  };
+  items.forEach((it) => it.btn.addEventListener("click", () => {
+    DNS_SEC_OPEN.set(it.key, !DNS_SEC_OPEN.get(it.key));
+    sync();
+  }));
+  all.addEventListener("click", () => {
+    const open = anyClosed();
+    items.forEach((it) => DNS_SEC_OPEN.set(it.key, open));
+    sync();
+  });
+  sync();
+  return { open(id) { DNS_SEC_OPEN.set(tag + ":" + id, true); sync(); } };
+}
+const DNS_SEC_CSS = `
+  .sec-toggle { flex:1; min-width:0; display:flex; align-items:center; gap:6px; margin:0; padding:2px 0;
+    background:none; border:none; border-radius:4px; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .sec-toggle:focus-visible, .sec-all:focus-visible { outline:2px solid var(--primary-color); outline-offset:2px; }
+  .sec-chev { --mdc-icon-size:20px; flex-shrink:0; color:var(--secondary-text-color); transition:transform .2s ease; }
+  .sec.open .sec-chev { transform:rotate(90deg); }
+  .sec:not(.open) .sec-head { margin-bottom:0; }
+  .sec-body[hidden] { display:none !important; }
+  .sec-all { display:block; margin:0 0 10px auto; padding:2px 6px; background:none; border:none;
+    border-radius:4px; font:inherit; font-size:12px; color:var(--secondary-text-color); cursor:pointer; }
+  .sec-all:hover { color:var(--primary-text-color); }
+  @media (prefers-reduced-motion: reduce) { .sec-chev { transition:none; } }
+`;
+
 class DnsStatusCard extends HTMLElement {
   /* ================= CONFIG ================= */
   setConfig(config) {
     if (!config.power_entity) {
-      throw new Error("La clé 'power_entity' est requise (switch de protection).");
+      throw new Error(dnsT(this._hass, "err_power"));
     }
     this._config = {
       title: config.title || "DNS",
@@ -28,9 +162,10 @@ class DnsStatusCard extends HTMLElement {
       accent_off: config.accent_off || "#E24B4A",
       icon_on: config.icon_on || "mdi:shield-check",
       icon_off: config.icon_off || "mdi:shield-off",
-      state_on: config.state_on || "Protection active",
-      state_off: config.state_off || "Protection désactivée",
-      state_paused: config.state_paused || "Désactivé (temporaire)",
+      // null = translated default, resolved at render time (hass not known yet)
+      state_on: config.state_on || null,
+      state_off: config.state_off || null,
+      state_paused: config.state_paused || null,
       status_dot: config.status_dot !== false,
       subtitle_entity: config.subtitle_entity || null,
       subtitle_suffix: config.subtitle_suffix || "",
@@ -332,7 +467,9 @@ class DnsStatusCard extends HTMLElement {
     const until = powerState && powerState.attributes
       ? powerState.attributes.temporary_disable_until
       : null;
-    hstate.textContent = on ? c.state_on : until ? c.state_paused : c.state_off;
+    hstate.textContent = on
+      ? c.state_on || dnsT(hass, "state_on")
+      : until ? c.state_paused || dnsT(hass, "state_paused") : c.state_off || dnsT(hass, "state_off");
     hstate.style.color = accent;
 
     const sep = root.querySelector(".hsep");
@@ -389,7 +526,7 @@ class DnsStatusCard extends HTMLElement {
         el.innerHTML =
           '<div class="sv" style="color:' + (s.color || "var(--primary-text-color)") + '">' +
           (st ? this._fmt(st.state) : "—") + "</div>" +
-          '<div class="sn">' + (s.name || (st && st.attributes.friendly_name) || s.entity) + "</div>";
+          '<div class="sn">' + dnsEsc(s.name || (st && st.attributes.friendly_name) || s.entity) + "</div>";
         el.addEventListener("click", () => this._fireMoreInfo(s.entity));
         sec.appendChild(el);
       });
@@ -414,8 +551,9 @@ class DnsStatusCard extends HTMLElement {
           (a.icon
             ? '<ha-icon icon="' + a.icon + '" style="color:' + (a.color || "inherit") + '"></ha-icon>'
             : "") +
-          "<span>" + a.name + "</span>";
+          "<span>" + dnsEsc(a.name) + "</span>";
         el.addEventListener("click", () => {
+          if (!a.entity) return; // row added in the editor but not filled in yet
           const domain = a.entity.split(".")[0];
           const service =
             a.service ||
@@ -460,7 +598,7 @@ class DnsStatusCard extends HTMLElement {
                   'transform="rotate(-90 21 21)"></circle>' +
           '<text x="21" y="' + (p.ring_label ? "19.5" : "24") + '" text-anchor="middle" ' +
                 'style="font-size:9.5px;font-weight:700;fill:var(--primary-text-color)">' +
-            (pct !== null ? pct.toFixed(1).replace(".", ",") : "—") +
+            (pct !== null ? this._pct(pct) : "—") +
           "</text>" +
           (p.ring_label
             ? '<text x="21" y="27" text-anchor="middle" ' +
@@ -483,8 +621,8 @@ class DnsStatusCard extends HTMLElement {
         (pct !== null
           ? '<div class="track"><div class="fill" style="width:' +
             Math.min(pct, 100).toFixed(1) + "%;background:" + color + '"></div></div>' +
-            '<div class="panel-foot">' + pct.toFixed(1).replace(".", ",") +
-            " % " + (p.foot || "du total") + "</div>"
+            '<div class="panel-foot">' + this._pct(pct) +
+            " % " + (p.foot || dnsT(hass, "of_total")) + "</div>"
           : p.foot
             ? '<div class="panel-foot">' + p.foot + "</div>"
             : "");
@@ -559,15 +697,21 @@ class DnsStatusCard extends HTMLElement {
     dIcon.setAttribute("icon", up ? "mdi:trending-up" : "mdi:trending-down");
     dIcon.style.color = dColor;
     const dSpan = delta.querySelector("span");
-    dSpan.textContent = (up ? "+" : "") + pct.toFixed(1).replace(".", ",") + " %";
+    dSpan.textContent = (up ? "+" : "") + this._pct(pct) + " %";
     dSpan.style.color = dColor;
   }
 
   /* ================= HELPERS ================= */
   _fmt(state) {
+    if (state === "unavailable" || state === "unknown") return "—";
     const n = parseFloat(state);
     if (isNaN(n)) return state;
-    return n.toLocaleString("fr-FR");
+    return n.toLocaleString(dnsLocale(this._hass));
+  }
+
+  /* Percentage with exactly one decimal, in the user's locale */
+  _pct(v) {
+    return v.toLocaleString(dnsLocale(this._hass), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   }
 
   _rgba(color, a) {
@@ -595,11 +739,15 @@ class DnsStatusCard extends HTMLElement {
     return size;
   }
 
-  static getStubConfig() {
+  /* Prefers the Technitium DNS (HACS) switch, then any switch, then a placeholder */
+  static getStubConfig(hass) {
+    const tech = Object.values(hass?.entities || {}).find(
+      (e) => e.platform === "technitiumdns" && e.entity_id.startsWith("switch."));
+    const anySwitch = Object.keys(hass?.states || {}).find((id) => id.startsWith("switch."));
     return {
       type: "custom:dns-status-card",
       title: "DNS",
-      power_entity: "switch.example",
+      power_entity: (tech && tech.entity_id) || anySwitch || "switch.example",
     };
   }
 
@@ -615,7 +763,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "dns-status-card",
   name: "DNS Status Card",
-  description: "Carte DNS configurable avec sparkline (Technitium, AdGuard, Pi-hole…).",
+  description: dnsT(null, "description"),
 });
 
 console.info(
@@ -629,15 +777,15 @@ console.info(
 
 type: custom:dns-status-card
 title: Technitium DNS
-power_entity: switch.enable_ad_blocking_dnsinterne
+power_entity: switch.example_enable_ad_blocking
 accent: "#1D9E75"
 accent_off: "#E24B4A"
 status_dot: true
-subtitle_entity: sensor.dnsinterne_technitiumdns_clients_dnsinterne
+subtitle_entity: sensor.example_clients
 subtitle_suffix: clients
 
 hero:
-  entity: sensor.dnsinterne_technitiumdns_total_queries_dnsinterne
+  entity: sensor.example_total_queries
   label: Requêtes · 24h
   color: "#378ADD"
   sparkline: true
@@ -646,45 +794,45 @@ hero:
 
 panels:
   - type: bar
-    entity: sensor.dnsinterne_technitiumdns_blocked_queries_dnsinterne
+    entity: sensor.example_blocked_queries
     name: Bloquées
     icon: mdi:shield-off
     color: "#E24B4A"
-    ratio_of: sensor.dnsinterne_technitiumdns_total_queries_dnsinterne
+    ratio_of: sensor.example_total_queries
     foot: du trafic
   - type: ring
-    entity: sensor.dnsinterne_technitiumdns_total_cached_dnsinterne
+    entity: sensor.example_total_cached
     name: Cache hit
     color: "#1D9E75"
-    ratio_of: sensor.dnsinterne_technitiumdns_total_queries_dnsinterne
+    ratio_of: sensor.example_total_queries
     ring_label: CACHE
     unit: réponses
 
 secondary:
-  - entity: sensor.dnsinterne_technitiumdns_total_no_error_dnsinterne
+  - entity: sensor.example_total_no_error
     name: NoError
-  - entity: sensor.dnsinterne_technitiumdns_total_nx_domain_dnsinterne
+  - entity: sensor.example_total_nx_domain
     name: NXDomain
     color: "#BA7517"
-  - entity: sensor.dnsinterne_technitiumdns_total_server_failure_dnsinterne
+  - entity: sensor.example_total_server_failure
     name: SrvFail
     color: "#E24B4A"
-  - entity: sensor.dnsinterne_technitiumdns_total_recursive_dnsinterne
+  - entity: sensor.example_total_recursive
     name: Récursif
     color: "#7F77DD"
 
 actions_label: Suspendre la protection
 actions:
   - name: 5m
-    entity: button.disable_ad_blocking_for_5_minutes_dnsinterne
+    entity: button.example_disable_ad_blocking_for_5_minutes
   - name: 10m
-    entity: button.disable_ad_blocking_for_10_minutes_dnsinterne
+    entity: button.example_disable_ad_blocking_for_10_minutes
   - name: 30m
-    entity: button.disable_ad_blocking_for_30_minutes_dnsinterne
+    entity: button.example_disable_ad_blocking_for_30_minutes
   - name: 1h
-    entity: button.disable_ad_blocking_for_60_minutes_dnsinterne
+    entity: button.example_disable_ad_blocking_for_60_minutes
   - name: 1j
-    entity: button.disable_ad_blocking_for_1_day_dnsinterne
+    entity: button.example_disable_ad_blocking_for_1_day
 
    ============================================================ */
 
@@ -694,31 +842,60 @@ actions:
    d'icônes et les champs texte. Aucune dépendance externe.
    ============================================================ */
 
-const L = {
-  title: "Titre",
-  power_entity: "Switch de protection (requis)",
-  subtitle_entity: "Entité du sous-titre",
-  subtitle_suffix: "Suffixe du sous-titre",
-  status_dot: "Pastille d'état sur l'icône",
-  icon_on: "Icône (protection active)",
-  icon_off: "Icône (protection coupée)",
-  state_on: "Texte (protection active)",
-  state_off: "Texte (protection coupée)",
-  state_paused: "Texte (pause temporaire)",
-  entity: "Entité",
-  label: "Libellé",
-  sparkline: "Afficher la courbe historique",
-  delta: "Afficher l'évolution en %",
-  hours: "Fenêtre historique (heures)",
-  type: "Type de panneau",
-  name: "Nom affiché",
-  icon: "Icône",
-  ratio_of: "Entité dénominateur (pour le %)",
-  foot: "Texte sous la barre",
-  ring_label: "Mot dans l'anneau",
-  unit: "Unité",
-  actions_label: "Titre de la zone d'actions",
-  service: "Service forcé (optionnel)",
+/* Field labels of the editor forms */
+const DNS_LABELS = {
+  fr: {
+    title: "Titre",
+    power_entity: "Switch de protection (requis)",
+    subtitle_entity: "Entité du sous-titre",
+    subtitle_suffix: "Suffixe du sous-titre",
+    status_dot: "Pastille d'état sur l'icône",
+    icon_on: "Icône (protection active)",
+    icon_off: "Icône (protection coupée)",
+    state_on: "Texte (protection active)",
+    state_off: "Texte (protection coupée)",
+    state_paused: "Texte (pause temporaire)",
+    entity: "Entité",
+    label: "Libellé",
+    sparkline: "Afficher la courbe historique",
+    delta: "Afficher l'évolution en %",
+    hours: "Fenêtre historique (heures)",
+    type: "Type de panneau",
+    name: "Nom affiché",
+    icon: "Icône",
+    ratio_of: "Entité dénominateur (pour le %)",
+    foot: "Texte sous la barre",
+    ring_label: "Mot dans l'anneau",
+    unit: "Unité",
+    actions_label: "Titre de la zone d'actions",
+    service: "Service forcé (optionnel)",
+  },
+  en: {
+    title: "Title",
+    power_entity: "Protection switch (required)",
+    subtitle_entity: "Subtitle entity",
+    subtitle_suffix: "Subtitle suffix",
+    status_dot: "Status dot on the icon",
+    icon_on: "Icon (protection enabled)",
+    icon_off: "Icon (protection disabled)",
+    state_on: "Text (protection enabled)",
+    state_off: "Text (protection disabled)",
+    state_paused: "Text (temporary pause)",
+    entity: "Entity",
+    label: "Label",
+    sparkline: "Show the history curve",
+    delta: "Show the change in %",
+    hours: "History window (hours)",
+    type: "Panel type",
+    name: "Display name",
+    icon: "Icon",
+    ratio_of: "Denominator entity (for the %)",
+    foot: "Text under the bar",
+    ring_label: "Word inside the ring",
+    unit: "Unit",
+    actions_label: "Actions area title",
+    service: "Forced service (optional)",
+  },
 };
 
 const SCHEMA_GENERAL = [
@@ -773,7 +950,7 @@ const SCHEMA_HERO = [
   },
 ];
 
-const SCHEMA_PANEL = [
+const dnsSchemaPanel = (t) => [
   {
     type: "grid",
     schema: [
@@ -783,8 +960,8 @@ const SCHEMA_PANEL = [
           select: {
             mode: "dropdown",
             options: [
-              { value: "bar", label: "Barre de progression" },
-              { value: "ring", label: "Anneau" },
+              { value: "bar", label: t("type_bar") },
+              { value: "ring", label: t("type_ring") },
             ],
           },
         },
@@ -895,15 +1072,19 @@ class DnsStatusCardEditor extends HTMLElement {
     );
   }
 
-  _computeLabel(s) {
-    return L[s.name] || s.name;
+  _t(key) {
+    return dnsT(this._hass, key);
   }
 
   /* ---------- Construction du squelette (une seule fois) ---------- */
   _build() {
+    // Arrow function: ha-form calls computeLabel with itself as `this`
+    this._computeLabel = (s) => DNS_LABELS[dnsLang(this._hass)][s.name] || s.name;
+    const t = (k) => this._t(k);
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
+        ${DNS_SEC_CSS}
         .sec { margin-bottom: 18px; }
         .sec-head {
           display: flex; align-items: center; gap: 8px;
@@ -959,63 +1140,64 @@ class DnsStatusCardEditor extends HTMLElement {
         ha-formfield { display: block; margin-bottom: 8px; }
       </style>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Général</span></div>
+      <div class="sec" data-sid="general">
+        <div class="sec-head"><span class="sec-title">${t("sec_general")}</span></div>
         <ha-form class="f-general"></ha-form>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Couleurs</span></div>
+      <div class="sec" data-sid="colors">
+        <div class="sec-head"><span class="sec-title">${t("sec_colors")}</span></div>
         <div class="colors">
           <div class="color-field">
             <input type="color" class="c-accent">
-            <label>Protection active</label>
+            <label>${t("c_on")}</label>
           </div>
           <div class="color-field">
             <input type="color" class="c-accent-off">
-            <label>Protection coupée</label>
+            <label>${t("c_off")}</label>
           </div>
         </div>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Textes et icônes</span></div>
+      <div class="sec" data-sid="appearance">
+        <div class="sec-head"><span class="sec-title">${t("sec_appearance")}</span></div>
         <ha-form class="f-appearance"></ha-form>
       </div>
 
-      <div class="sec">
+      <div class="sec" data-sid="hero">
         <div class="sec-head">
-          <span class="sec-title">Bloc principal</span>
+          <span class="sec-title">${t("sec_hero")}</span>
           <ha-switch class="sw-hero"></ha-switch>
         </div>
-        <div class="sec-hint">Grand chiffre avec courbe historique. Nécessite que le recorder conserve l'entité.</div>
+        <div class="sec-hint">${t("hint_hero")}</div>
         <ha-form class="f-hero"></ha-form>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Panneaux</span></div>
-        <div class="sec-hint">Maximum 2 recommandés (affichés côte à côte). Le dénominateur sert à calculer le pourcentage.</div>
+      <div class="sec" data-sid="panels">
+        <div class="sec-head"><span class="sec-title">${t("sec_panels")}</span></div>
+        <div class="sec-hint">${t("hint_panels")}</div>
         <div class="rows-panels"></div>
-        <div class="addbtn add-panel"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter un panneau</span></div>
+        <div class="addbtn add-panel"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add_panel")}</span></div>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Stats secondaires</span></div>
-        <div class="sec-hint">Petite rangée en bas. 3 à 5 conseillés pour rester lisible sur mobile.</div>
+      <div class="sec" data-sid="secondary">
+        <div class="sec-head"><span class="sec-title">${t("sec_secondary")}</span></div>
+        <div class="sec-hint">${t("hint_secondary")}</div>
         <div class="rows-secondary"></div>
-        <div class="addbtn add-secondary"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter une stat</span></div>
+        <div class="addbtn add-secondary"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add_secondary")}</span></div>
       </div>
 
-      <div class="sec">
-        <div class="sec-head"><span class="sec-title">Actions</span></div>
-        <div class="sec-hint">Boutons du bas. Le service est déduit du domaine (button → press, switch → toggle).</div>
+      <div class="sec" data-sid="actions">
+        <div class="sec-head"><span class="sec-title">${t("sec_actions")}</span></div>
+        <div class="sec-hint">${t("hint_actions")}</div>
         <ha-form class="f-actions-label"></ha-form>
         <div class="rows-actions"></div>
-        <div class="addbtn add-action"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter une action</span></div>
+        <div class="addbtn add-action"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add_action")}</span></div>
       </div>
     `;
 
     const r = this.shadowRoot;
+    this._sections = dnsCollapsible(r, "dns-status-card-editor", t);
 
     /* --- Formulaire général --- */
     const fGeneral = r.querySelector(".f-general");
@@ -1065,6 +1247,7 @@ class DnsStatusCardEditor extends HTMLElement {
     swHero.addEventListener("change", (e) => {
       if (e.target.checked) {
         this._config.hero = this._config.hero || { sparkline: true, hours: 24, delta: true };
+        this._sections.open("hero");
       } else {
         delete this._config.hero;
       }
@@ -1145,9 +1328,9 @@ class DnsStatusCardEditor extends HTMLElement {
     fApp.data = {
       icon_on: c.icon_on || "mdi:shield-check",
       icon_off: c.icon_off || "mdi:shield-off",
-      state_on: c.state_on || "Protection active",
-      state_off: c.state_off || "Protection désactivée",
-      state_paused: c.state_paused || "Désactivé (temporaire)",
+      state_on: c.state_on || this._t("state_on"),
+      state_off: c.state_off || this._t("state_off"),
+      state_paused: c.state_paused || this._t("state_paused"),
     };
 
     /* Couleurs */
@@ -1176,7 +1359,7 @@ class DnsStatusCardEditor extends HTMLElement {
     fAL.data = { actions_label: c.actions_label || "" };
 
     /* Listes répétables */
-    this._syncRows("panels", ".rows-panels", SCHEMA_PANEL, forceRows);
+    this._syncRows("panels", ".rows-panels", dnsSchemaPanel((k) => this._t(k)), forceRows);
     this._syncRows("secondary", ".rows-secondary", SCHEMA_SECONDARY, forceRows);
     this._syncRows("actions", ".rows-actions", SCHEMA_ACTION, forceRows);
   }
@@ -1193,7 +1376,7 @@ class DnsStatusCardEditor extends HTMLElement {
       if (!list.length) {
         const e = document.createElement("div");
         e.className = "empty";
-        e.textContent = "Aucun élément. Utilise le bouton ci-dessous.";
+        e.textContent = this._t("empty");
         container.appendChild(e);
       }
       list.forEach((item, i) => {
@@ -1294,7 +1477,7 @@ class DnsStatusCardEditor extends HTMLElement {
       applyRowColor(e.target.value);
     });
     const cl = document.createElement("label");
-    cl.textContent = "Couleur";
+    cl.textContent = this._t("color");
     cf.appendChild(ci);
     cf.appendChild(cl);
     row.appendChild(cf);

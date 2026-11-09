@@ -19,6 +19,10 @@
   "home": {
    "fr": "Maison",
    "en": "Home"
+  },
+  "containers": {
+   "fr": "Conteneurs",
+   "en": "Containers"
   }
  },
  "integrations": {
@@ -56,6 +60,11 @@
    "name": "Intex Spa",
    "url": "https://github.com/mathieu-mp/homeassistant-intex-spa",
    "kind": "hacs"
+  },
+  "portainer": {
+   "name": "Portainer",
+   "url": "https://www.home-assistant.io/integrations/portainer/",
+   "kind": "core"
   }
  },
  "cards": [
@@ -338,6 +347,55 @@
    "name": {
     "en": "Intex Spa",
     "fr": "Spa Intex"
+   }
+  },
+  {
+   "id": "portainer-containers",
+   "category": "containers",
+   "type": "custom:portainer-containers-card",
+   "file": "containers/portainer-containers-card.js",
+   "integration": "portainer",
+   "desc": {
+    "fr": "Conteneurs Docker : état, santé, CPU, mémoire, uptime, mises à jour d'image, recherche, filtres, tri, groupement par stack et actions (démarrer, arrêter, redémarrer, pause, kill, recréer).",
+    "en": "Docker containers: state, health, CPU, memory, uptime, image updates, search, filters, sorting, grouping by stack and actions (start, stop, restart, pause, kill, recreate)."
+   },
+   "note": {
+    "fr": "Découverte automatique de tous les conteneurs ; limitez par endpoint ou stack dans l'éditeur. Certains capteurs (CPU, mémoire) peuvent être désactivés par défaut dans l'intégration.",
+    "en": "Auto-discovers every container; narrow it down by endpoint or stack in the editor. Some sensors (CPU, memory) may be disabled by default in the integration."
+   },
+   "name": {
+    "en": "Portainer – Containers",
+    "fr": "Portainer – Conteneurs"
+   }
+  },
+  {
+   "id": "portainer-stacks",
+   "category": "containers",
+   "type": "custom:portainer-stacks-card",
+   "file": "containers/portainer-stacks-card.js",
+   "integration": "portainer",
+   "desc": {
+    "fr": "Stacks Portainer : type, nombre de conteneurs, démarrer / arrêter, mise à jour (redéploiement) et résumé des conteneurs.",
+    "en": "Portainer stacks: type, container count, start / stop, update (redeploy) and container summary."
+   },
+   "name": {
+    "en": "Portainer – Stacks",
+    "fr": "Portainer – Stacks"
+   }
+  },
+  {
+   "id": "portainer-endpoint",
+   "category": "containers",
+   "type": "custom:portainer-endpoint-card",
+   "file": "containers/portainer-endpoint-card.js",
+   "integration": "portainer",
+   "desc": {
+    "fr": "Endpoint Docker : version, OS, architecture, CPU / mémoire, compteurs de conteneurs, images, usage disque et purges (images, volumes, cache de build, réseaux).",
+    "en": "Docker endpoint: version, OS, architecture, CPU / memory, container counters, images, disk usage and prunes (images, volumes, build cache, networks)."
+   },
+   "name": {
+    "en": "Portainer – Endpoint",
+    "fr": "Portainer – Endpoint"
    }
   }
  ]

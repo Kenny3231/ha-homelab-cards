@@ -1,20 +1,80 @@
 /**
- * Proxmox Guests Card — VM (QEMU) et conteneurs (LXC)
+ * Proxmox Guests Card — VMs (QEMU) and containers (LXC)
  * Version 1.0.0
  *
- * Une seule carte pour les deux : instancie-la deux fois si tu veux
- * un bloc « Machines virtuelles » et un bloc « Conteneurs ».
+ * One card for both: add it twice for a "Virtual machines" block and a
+ * "Containers" block (see `guest_type`).
  *
- * Les boutons s'adaptent à l'état : un invité arrêté propose « Démarrer »,
- * un invité en marche propose « Éteindre / Forcer l'arrêt / Redémarrer ».
+ * Buttons follow the state: a stopped guest offers "Start", a running guest
+ * offers "Shut down / Force stop / Reboot".
  *
- * Installation :
- *  1. config/www/perso/proxmox-guests-card.js
- *  2. Resources → /local/perso/proxmox-guests-card.js?v=1 → JavaScript Module
- *  3. Ctrl+Shift+R
+ * Loaded automatically by the Homelab Cards integration.
+ * With an empty `guests` list, guests are detected from the Proxmox VE (HACS
+ * "proxmoxve") integration through the entity/device registries
+ * (platform + translation_key + device model), never from names or UI language.
  */
 
 const PGUEST_VERSION = "1.0.0";
+
+/* ---------- i18n ---------- */
+const PG_I18N = {
+  en: {
+    def_title: "Guests", running: "{0} running", stopped: "stopped", guest: "Guest",
+    this_guest: "this guest", missing: "{0} guest(s) with a status entity not found.",
+    none: "No guest found (Proxmox VE integration).",
+    b_cpu: "CPU", b_mem: "RAM", b_disk: "Disk",
+    y: "y", mo: "mo", d: "d",
+    act_start: "Start", act_resume: "Resume", act_shutdown: "Shut down", act_stop: "Force stop",
+    act_reboot: "Reboot", act_reset: "Reset", act_suspend: "Suspend", act_hibernate: "Hibernate",
+    /* editor */
+    title: "Title", icon: "Icon", show_bars: "Show CPU/RAM/disk bars",
+    show_network: "Show network traffic", show_uptime: "Show uptime",
+    warn_at: "Warning threshold (%)", critical_at: "Critical threshold (%)",
+    node: "Node (name or device ID, auto-detection)", guest_type: "Guest type (auto-detection)",
+    gt_all: "VMs and containers", gt_qemu: "Virtual machines (QEMU)", gt_lxc: "Containers (LXC)",
+    name: "Guest name", vmid: "ID (VMID)",
+    status: "Status sensor", status_text: "Status as text", health: "Health",
+    cpu: "CPU (%)", memory: "Memory (%)", disk: "Disk (%)",
+    network_in: "Network in", network_out: "Network out", last_boot: "Last boot",
+    s_general: "General", s_colors: "Colors", s_guests: "Guests",
+    c_accent: "Accent", c_on: "Running", buttons: "Action buttons", empty: "No guest.",
+    add_guest: "Add a guest", guest_n: "Guest #{0}",
+    expand_all: "Expand all", collapse_all: "Collapse all",
+    hint_guests: "Buttons follow the state: “Start” when the guest is stopped, “Shut down / Force / Reboot” when it runs. Leave empty the actions your guest type does not have. Leave the list empty to detect guests automatically.",
+    desc: "VMs and LXC containers: status, resources and contextual actions.",
+  },
+  fr: {
+    def_title: "Invités", running: "{0} en marche", stopped: "arrêté", guest: "Invité",
+    this_guest: "cet invité", missing: "{0} invité(s) avec une entité d'état introuvable.",
+    none: "Aucun invité détecté (intégration Proxmox VE).",
+    b_cpu: "CPU", b_mem: "RAM", b_disk: "Disque",
+    y: "an", mo: "mois", d: "j",
+    act_start: "Démarrer", act_resume: "Reprendre", act_shutdown: "Éteindre", act_stop: "Forcer l'arrêt",
+    act_reboot: "Redémarrer", act_reset: "Réinitialiser", act_suspend: "Suspendre", act_hibernate: "Hiberner",
+    title: "Titre", icon: "Icône", show_bars: "Afficher les barres CPU/RAM/disque",
+    show_network: "Afficher le trafic réseau", show_uptime: "Afficher la durée de marche",
+    warn_at: "Seuil d'alerte (%)", critical_at: "Seuil critique (%)",
+    node: "Nœud (nom ou ID d'appareil, détection auto)", guest_type: "Type d'invité (détection auto)",
+    gt_all: "VM et conteneurs", gt_qemu: "Machines virtuelles (QEMU)", gt_lxc: "Conteneurs (LXC)",
+    name: "Nom de l'invité", vmid: "Identifiant (VMID)",
+    status: "Capteur d'état", status_text: "État en texte", health: "Santé",
+    cpu: "CPU (%)", memory: "Mémoire (%)", disk: "Disque (%)",
+    network_in: "Réseau entrant", network_out: "Réseau sortant", last_boot: "Dernier démarrage",
+    s_general: "Général", s_colors: "Couleurs", s_guests: "Invités",
+    c_accent: "Accent", c_on: "En marche", buttons: "Boutons d'action", empty: "Aucun invité.",
+    add_guest: "Ajouter un invité", guest_n: "Invité #{0}",
+    expand_all: "Tout déplier", collapse_all: "Tout replier",
+    hint_guests: "Les boutons s'adaptent à l'état : « Démarrer » quand l'invité est arrêté, « Éteindre / Forcer / Redémarrer » quand il tourne. Laisse vide les actions que ton type d'invité n'a pas. Laisse la liste vide pour détecter les invités automatiquement.",
+    desc: "VM et conteneurs LXC : état, ressources et actions contextuelles.",
+  },
+};
+const gLoc = (h) => (h && ((h.locale && h.locale.language) || h.language)) || "en";
+const gDict = (loc) => PG_I18N[/^fr/i.test(loc) ? "fr" : "en"];
+const gT = (h, k, a) => {
+  const v = gDict(gLoc(h))[k];
+  const s = v !== undefined ? v : (PG_I18N.en[k] !== undefined ? PG_I18N.en[k] : k);
+  return a === undefined ? s : String(s).replace("{0}", a);
+};
 
 const gRgba = (c, a) => {
   if (!c || c.indexOf("var(") === 0 || c.indexOf("rgb") === 0) return c;
@@ -27,11 +87,11 @@ const gNum = (st) => {
   const n = parseFloat(st.state);
   return isNaN(n) ? NaN : n;
 };
-const gFmt = (st, d) => {
+const gFmt = (st, d, h) => {
   if (!st) return "—";
   const n = parseFloat(st.state);
-  if (isNaN(n)) return st.state;
-  return n.toLocaleString("fr-FR", { maximumFractionDigits: d === undefined ? 1 : d });
+  if (isNaN(n)) return st.state === "unavailable" || st.state === "unknown" ? "—" : st.state;
+  return n.toLocaleString(gLoc(h), { maximumFractionDigits: d === undefined ? 1 : d });
 };
 const gUnit = (st) => (st && st.attributes ? st.attributes.unit_of_measurement || "" : "");
 const gEsc = (s) => String(s).replace(/[&<>"']/g, (c) =>
@@ -42,41 +102,100 @@ const gOn = (st) => {
   if (s === "unavailable" || s === "unknown") return false;
   return s === "on" || s === "running" || s === "online";
 };
-function gSince(raw) {
+function gSince(raw, h) {
   if (!raw) return null;
   const t = Date.parse(raw);
   if (isNaN(t)) return null;
   const sec = Math.floor((Date.now() - t) / 1000);
   if (sec < 0) return null;
   const d = Math.floor(sec / 86400);
-  if (d >= 365) { const y = Math.floor(d / 365); return y + " an" + (y > 1 ? "s" : ""); }
-  if (d >= 30) { const mo = Math.floor(d / 30); return mo + " mois"; }
-  if (d >= 1) return d + " j";
-  const h = Math.floor(sec / 3600);
-  if (h >= 1) return h + " h";
+  if (d >= 365) {
+    const y = Math.floor(d / 365);
+    return y + " " + gT(h, "y") + (y > 1 && /^fr/i.test(gLoc(h)) ? "s" : "");
+  }
+  if (d >= 30) return Math.floor(d / 30) + " " + gT(h, "mo");
+  if (d >= 1) return d + " " + gT(h, "d");
+  const hr = Math.floor(sec / 3600);
+  if (hr >= 1) return hr + " h";
   return Math.max(1, Math.floor(sec / 60)) + " min";
 }
 
-/* Catalogue des actions : icône, couleur, libellé, et si elles sont à risque */
+/* Action catalogue: icon, color and the state in which it is offered.
+   The key is also the proxmoxve button translation_key. */
 const G_ACTIONS = {
-  start:     { icon: "mdi:play",           color: "#1D9E75", label: "Démarrer",       risky: false, when: "off" },
-  resume:    { icon: "mdi:play-pause",     color: "#1D9E75", label: "Reprendre",      risky: false, when: "off" },
-  shutdown:  { icon: "mdi:power",          color: "#BA7517", label: "Éteindre",       risky: true,  when: "on" },
-  stop:      { icon: "mdi:stop",           color: "#E24B4A", label: "Forcer l'arrêt", risky: true,  when: "on" },
-  reboot:    { icon: "mdi:restart",        color: "#378ADD", label: "Redémarrer",     risky: true,  when: "on" },
-  reset:     { icon: "mdi:restart-alert",  color: "#E24B4A", label: "Réinitialiser",  risky: true,  when: "on" },
-  suspend:   { icon: "mdi:pause",          color: "#7F77DD", label: "Suspendre",      risky: true,  when: "on" },
-  hibernate: { icon: "mdi:snowflake",      color: "#7F77DD", label: "Hiberner",       risky: true,  when: "on" },
+  start:     { icon: "mdi:play",           color: "#1D9E75", when: "off" },
+  resume:    { icon: "mdi:play-pause",     color: "#1D9E75", when: "off" },
+  shutdown:  { icon: "mdi:power",          color: "#BA7517", when: "on" },
+  stop:      { icon: "mdi:stop",           color: "#E24B4A", when: "on" },
+  reboot:    { icon: "mdi:restart",        color: "#378ADD", when: "on" },
+  reset:     { icon: "mdi:restart-alert",  color: "#E24B4A", when: "on" },
+  suspend:   { icon: "mdi:pause",          color: "#7F77DD", when: "on" },
+  hibernate: { icon: "mdi:snowflake",      color: "#7F77DD", when: "on" },
 };
 const G_ORDER = ["start", "resume", "shutdown", "stop", "reboot", "reset", "suspend", "hibernate"];
 
+/* ---------- proxmoxve auto-detection ---------- */
+/* { device_id: { "<domain>.<translation_key>": entity_id } } for proxmoxve entities */
+function pgByDevice(hass) {
+  const out = {};
+  Object.values((hass && hass.entities) || {}).forEach((e) => {
+    if (!e || e.platform !== "proxmoxve" || !e.device_id || !e.translation_key) return;
+    if (!hass.states[e.entity_id]) return;
+    const m = out[e.device_id] || (out[e.device_id] = {});
+    m[e.entity_id.split(".")[0] + "." + e.translation_key] = e.entity_id;
+  });
+  return out;
+}
+/* Node device id matching `want` (device id, device name or "… <node>") */
+function pgNodeId(hass, by, want) {
+  const devs = hass.devices || {};
+  return Object.keys(by).find((id) => {
+    const e = by[id];
+    if (!(e["sensor.node_status"] || e["sensor.qemu_on"] || e["sensor.lxc_on"] || e["button.start_all"])) return false;
+    return [id, devs[id] && devs[id].name_by_user, devs[id] && devs[id].name]
+      .some((x) => x && (x === want || String(x).endsWith(" " + want)));
+  }) || null;
+}
+/* Guest devices: model "QEMU" / "LXC", name "<TYPE> <name> (<vmid>)" */
+function pgDetect(hass, want, type) {
+  if (!hass) return [];
+  const by = pgByDevice(hass), devs = hass.devices || {};
+  const nodeId = want ? pgNodeId(hass, by, want) : null;
+  if (want && !nodeId) return [];
+  const kindWanted = type && type !== "all" ? String(type).toUpperCase() : null;
+  return Object.keys(by).map((id) => {
+    const e = by[id], d = devs[id] || {};
+    const kind = String(d.model || "").toUpperCase();
+    if (kind !== "QEMU" && kind !== "LXC") return null;
+    if (kindWanted && kind !== kindWanted) return null;
+    if (nodeId && d.via_device_id !== nodeId) return null;
+    const m = /^\S+\s+(.*)\s+\((\d+)\)$/.exec(d.name || "");
+    const actions = {};
+    G_ORDER.forEach((k) => { if (e["button." + k]) actions[k] = e["button." + k]; });
+    const g = {
+      name: d.name_by_user || (m ? m[1] : d.name) || id,
+      vmid: m ? m[2] : undefined,
+      status: e["binary_sensor.status"],
+      status_text: e["sensor.status_raw"],
+      health: e["binary_sensor.health"],
+      cpu: e["sensor.cpu_used"],
+      memory: e["sensor.memory_used_perc"],
+      disk: e["sensor.disk_used_perc"],
+      network_in: e["sensor.network_in"],
+      network_out: e["sensor.network_out"],
+      last_boot: e["sensor.uptime"],
+    };
+    if (Object.keys(actions).length) g.actions = actions;
+    return g;
+  }).filter(Boolean).sort((a, b) =>
+    (parseInt(a.vmid, 10) || 0) - (parseInt(b.vmid, 10) || 0) || String(a.name).localeCompare(String(b.name)));
+}
+
 class ProxmoxGuestsCard extends HTMLElement {
   setConfig(config) {
-    if (!config.guests || !config.guests.length) {
-      throw new Error("La clé 'guests' est requise (au moins un invité).");
-    }
+    this._auto = !(config.guests && config.guests.length);
     this._config = {
-      title: config.title || "Invités",
+      title: config.title || null,
       icon: config.icon || "mdi:server",
       accent: config.accent || "#378ADD",
       color_on: config.color_on || "#1D9E75",
@@ -91,8 +210,11 @@ class ProxmoxGuestsCard extends HTMLElement {
       show_uptime: config.show_uptime !== false,
       confirm_actions: config.confirm_actions ||
         ["stop", "shutdown", "reboot", "reset", "suspend", "hibernate"],
-      guests: config.guests,
+      node: config.node || null,
+      guest_type: config.guest_type || "all",
+      guests: this._auto ? [] : config.guests,
     };
+    this._ents = undefined;
     this._built = false;
     this._pending = {};
   }
@@ -106,6 +228,10 @@ class ProxmoxGuestsCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._auto && hass.entities !== this._ents) {
+      this._ents = hass.entities;
+      this._config.guests = pgDetect(hass, this._config.node, this._config.guest_type);
+    }
     if (!this._built) { this._build(); this._built = true; }
     const sig = this._sig(hass);
     if (sig !== this._last) { this._last = sig; this._render(); }
@@ -120,7 +246,8 @@ class ProxmoxGuestsCard extends HTMLElement {
     return [...new Set(ids)];
   }
   _sig(h) {
-    return this._ids().map((id) => id + ":" + (h.states[id] ? h.states[id].state : "∅")).join("|");
+    return gLoc(h) + "#" + this._config.guests.length + "#" +
+      this._ids().map((id) => id + ":" + (h.states[id] ? h.states[id].state : "∅")).join("|");
   }
 
   _barColor(pct, base) {
@@ -174,6 +301,7 @@ class ProxmoxGuestsCard extends HTMLElement {
         .btn ha-icon { --mdc-icon-size:13px; }
         .btn.busy { opacity:.35; cursor:default; }
         .warn { font-size:11px; color:#BA7517; padding:2px 2px 8px 2px; line-height:1.4; }
+        .none { font-size:11px; color:var(--secondary-text-color); font-style:italic; padding:2px; }
         .hidden { display:none !important; }
       </style>
       <ha-card>
@@ -187,6 +315,7 @@ class ProxmoxGuestsCard extends HTMLElement {
 
   _render() {
     const hass = this._hass, c = this._config, r = this.shadowRoot;
+    const t = (k, a) => gT(hass, k, a);
 
     r.querySelector("ha-card").style.borderColor = gRgba(c.accent, 0.28);
     const disc = r.querySelector(".disc");
@@ -194,7 +323,7 @@ class ProxmoxGuestsCard extends HTMLElement {
     const ic = disc.querySelector("ha-icon");
     ic.setAttribute("icon", c.icon);
     ic.style.color = c.accent;
-    r.querySelector(".htitle").textContent = c.title;
+    r.querySelector(".htitle").textContent = c.title || t("def_title");
 
     let running = 0, missing = 0;
     c.guests.forEach((g) => {
@@ -203,15 +332,22 @@ class ProxmoxGuestsCard extends HTMLElement {
       if (gOn(st)) running++;
     });
     r.querySelector(".hsub").innerHTML =
-      '<b style="color:' + c.color_on + '">' + running + " en marche</b> / " + c.guests.length;
+      '<b style="color:' + c.color_on + '">' + gEsc(t("running", running)) + "</b> / " + c.guests.length;
 
     const list = r.querySelector(".list");
     list.innerHTML = "";
 
+    if (!c.guests.length) {
+      const n = document.createElement("div");
+      n.className = "none";
+      n.textContent = t("none");
+      list.appendChild(n);
+    }
+
     if (missing) {
       const w = document.createElement("div");
       w.className = "warn";
-      w.textContent = missing + " invité(s) avec une entité d'état introuvable.";
+      w.textContent = t("missing", missing);
       list.appendChild(w);
     }
 
@@ -221,13 +357,14 @@ class ProxmoxGuestsCard extends HTMLElement {
       const el = document.createElement("div");
       el.className = "gu" + (on ? "" : " off");
 
-      /* --- Ligne 1 : état, nom, santé --- */
+      /* --- Line 1: state, name, health --- */
       const top = document.createElement("div");
       top.className = "gu-top";
 
-      const stateLabel = g.status_text && hass.states[g.status_text]
-        ? hass.states[g.status_text].state
-        : (on ? "" : "arrêté");
+      const txtSt = g.status_text ? hass.states[g.status_text] : null;
+      const stateLabel = txtSt
+        ? (hass.formatEntityState ? hass.formatEntityState(txtSt) : txtSt.state)
+        : (on ? "" : t("stopped"));
 
       let healthHtml = "";
       if (g.health && hass.states[g.health]) {
@@ -239,7 +376,7 @@ class ProxmoxGuestsCard extends HTMLElement {
 
       top.innerHTML =
         '<span class="dot" style="background:' + (on ? c.color_on : c.color_off) + '"></span>' +
-        '<span class="gu-name">' + gEsc(g.name || "Invité") +
+        '<span class="gu-name">' + gEsc(g.name || t("guest")) +
           (g.vmid ? ' <span class="vmid">· ' + gEsc(g.vmid) + "</span>" : "") + "</span>" +
         (stateLabel ? '<span class="gu-state">' + gEsc(stateLabel) + "</span>" : "") +
         healthHtml;
@@ -247,14 +384,14 @@ class ProxmoxGuestsCard extends HTMLElement {
         this._more(g.status || g.cpu));
       el.appendChild(top);
 
-      /* --- Ligne 2 : barres CPU / RAM / disque (seulement si en marche) --- */
+      /* --- Line 2: CPU / RAM / disk bars (only while running) --- */
       if (c.show_bars && on) {
         const bars = document.createElement("div");
         bars.className = "bars";
         const defs = [
-          { e: g.cpu, n: "CPU", col: c.color_cpu },
-          { e: g.memory, n: "RAM", col: c.color_mem },
-          { e: g.disk, n: "Disque", col: c.color_disk },
+          { e: g.cpu, n: t("b_cpu"), col: c.color_cpu },
+          { e: g.memory, n: t("b_mem"), col: c.color_mem },
+          { e: g.disk, n: t("b_disk"), col: c.color_disk },
         ].filter((d) => d.e);
         if (defs.length) {
           defs.forEach((d) => {
@@ -264,7 +401,7 @@ class ProxmoxGuestsCard extends HTMLElement {
             const b = document.createElement("div");
             b.className = "bar";
             b.innerHTML =
-              '<div class="bar-top"><span>' + d.n + "</span><span>" +
+              '<div class="bar-top"><span>' + gEsc(d.n) + "</span><span>" +
                 (isNaN(pct) ? "—" : pct.toFixed(0) + " %") + "</span></div>" +
               '<div class="bar-t"><div class="bar-f" style="width:' +
                 (isNaN(pct) ? 0 : Math.min(Math.max(pct, 0), 100)).toFixed(1) +
@@ -276,7 +413,7 @@ class ProxmoxGuestsCard extends HTMLElement {
         }
       }
 
-      /* --- Ligne 3 : réseau, uptime, boutons --- */
+      /* --- Line 3: network, uptime, buttons --- */
       const foot = document.createElement("div");
       foot.className = "gu-foot";
       const parts = [];
@@ -285,17 +422,17 @@ class ProxmoxGuestsCard extends HTMLElement {
         const inSt = g.network_in ? hass.states[g.network_in] : null;
         const outSt = g.network_out ? hass.states[g.network_out] : null;
         if (inSt) parts.push('<span><ha-icon icon="mdi:arrow-down" style="color:' +
-          c.color_cpu + '"></ha-icon> ' + gFmt(inSt) + " " + gEsc(gUnit(inSt)) + "</span>");
+          c.color_cpu + '"></ha-icon> ' + gEsc(gFmt(inSt, undefined, hass)) + " " + gEsc(gUnit(inSt)) + "</span>");
         if (outSt) parts.push('<span><ha-icon icon="mdi:arrow-up" style="color:' +
-          c.color_disk + '"></ha-icon> ' + gFmt(outSt) + " " + gEsc(gUnit(outSt)) + "</span>");
+          c.color_disk + '"></ha-icon> ' + gEsc(gFmt(outSt, undefined, hass)) + " " + gEsc(gUnit(outSt)) + "</span>");
       }
       if (c.show_uptime && on && g.last_boot && hass.states[g.last_boot]) {
-        const since = gSince(hass.states[g.last_boot].state);
-        if (since) parts.push('<span><ha-icon icon="mdi:clock-outline"></ha-icon> ' + since + "</span>");
+        const since = gSince(hass.states[g.last_boot].state, hass);
+        if (since) parts.push('<span><ha-icon icon="mdi:clock-outline"></ha-icon> ' + gEsc(since) + "</span>");
       }
       foot.innerHTML = parts.join("");
 
-      /* Boutons contextuels */
+      /* Contextual buttons */
       const btns = document.createElement("div");
       btns.className = "btns";
       const acts = g.actions || {};
@@ -304,13 +441,14 @@ class ProxmoxGuestsCard extends HTMLElement {
         const entity = acts[key];
         if (!entity) return;
         const def = G_ACTIONS[key];
+        const label = t("act_" + key);
         if (on && def.when === "off") return;
         if (!on && def.when === "on") return;
         any = true;
         const busy = this._pending[entity];
         const b = document.createElement("div");
         b.className = "btn" + (busy ? " busy" : "");
-        b.title = def.label;
+        b.title = label;
         b.style.background = gRgba(def.color, 0.14);
         b.innerHTML = '<ha-icon icon="' + def.icon + '" style="color:' + def.color + '"></ha-icon>';
         b.addEventListener("click", (e) => {
@@ -318,12 +456,14 @@ class ProxmoxGuestsCard extends HTMLElement {
           if (this._pending[entity]) return;
           const needsConfirm = c.confirm_actions.indexOf(key) !== -1;
           if (needsConfirm) {
-            const who = (g.name || "cet invité") + (g.vmid ? " (" + g.vmid + ")" : "");
-            if (!window.confirm(def.label + " « " + who + " » ?")) return;
+            const who = (g.name || t("this_guest")) + (g.vmid ? " (" + g.vmid + ")" : "");
+            if (!window.confirm(label + " « " + who + " » ?")) return;
           }
           this._pending[entity] = true;
           this._render();
-          this._hass.callService("button", "press", { entity_id: entity });
+          const domain = String(entity).split(".")[0];
+          const svc = domain === "button" ? "press" : domain === "switch" ? "toggle" : "turn_on";
+          this._hass.callService(domain, svc, { entity_id: entity });
           setTimeout(() => { delete this._pending[entity]; this._render(); }, 3000);
         });
         btns.appendChild(b);
@@ -343,27 +483,18 @@ class ProxmoxGuestsCard extends HTMLElement {
   }
 
   getCardSize() { return 2 + this._config.guests.length * 2; }
-  static getStubConfig() {
-    return { type: "custom:proxmox-guests-card", title: "Invités", guests: [{ name: "Invité 1" }] };
+  static getStubConfig(hass) {
+    /* JSON round-trip drops the undefined keys of entities that do not exist */
+    const guests = JSON.parse(JSON.stringify(pgDetect(hass, null, "all")));
+    return { type: "custom:proxmox-guests-card", title: gT(hass, "def_title"),
+      guests: guests.length ? guests : [{ name: gT(hass, "guest") + " 1" }] };
   }
   static getConfigElement() { return document.createElement("proxmox-guests-card-editor"); }
 }
 customElements.define("proxmox-guests-card", ProxmoxGuestsCard);
 
-/* ================= ÉDITEUR ================= */
-const PG_L = {
-  title: "Titre", icon: "Icône", show_bars: "Afficher les barres CPU/RAM/disque",
-  show_network: "Afficher le trafic réseau", show_uptime: "Afficher la durée de marche",
-  warn_at: "Seuil d'alerte (%)", critical_at: "Seuil critique (%)",
-  name: "Nom de l'invité", vmid: "Identifiant (VMID)",
-  status: "Capteur d'état", status_text: "État en texte", health: "Santé",
-  cpu: "CPU (%)", memory: "Mémoire (%)", disk: "Disque (%)",
-  network_in: "Réseau entrant", network_out: "Réseau sortant", last_boot: "Dernier démarrage",
-  a_start: "Démarrer", a_resume: "Reprendre", a_shutdown: "Éteindre",
-  a_stop: "Forcer l'arrêt", a_reboot: "Redémarrer", a_reset: "Réinitialiser",
-  a_suspend: "Suspendre", a_hibernate: "Hiberner",
-};
-const PG_S_GEN = [
+/* ================= EDITOR ================= */
+const PG_S_GEN = (t) => [
   { type: "grid", schema: [
     { name: "title", selector: { text: {} } },
     { name: "icon", selector: { icon: {} } },
@@ -375,6 +506,14 @@ const PG_S_GEN = [
   { name: "show_bars", selector: { boolean: {} } },
   { name: "show_network", selector: { boolean: {} } },
   { name: "show_uptime", selector: { boolean: {} } },
+  { type: "grid", schema: [
+    { name: "node", selector: { text: {} } },
+    { name: "guest_type", selector: { select: { mode: "dropdown", options: [
+      { value: "all", label: t("gt_all") },
+      { value: "qemu", label: t("gt_qemu") },
+      { value: "lxc", label: t("gt_lxc") },
+    ]}}},
+  ]},
 ];
 const SENSOR = { entity: { filter: { domain: ["sensor"] } } };
 const BINSENS = { entity: { filter: { domain: ["binary_sensor", "sensor"] } } };
@@ -405,16 +544,60 @@ const PG_S_ACTS = [
   { name: "a_hibernate", selector: BTN },
 ];
 
+/* ---------- Collapsible editor sections (state kept across editor re-creations) ---------- */
+const PG_SEC_STATE = new Map();
+const PG_SEC_CSS = `
+  .sec-tools { display:flex; justify-content:flex-end; margin-bottom:4px; }
+  .sec-all { background:none; border:none; padding:2px 4px; border-radius:4px; cursor:pointer;
+    font:inherit; font-size:12px; color:var(--secondary-text-color); }
+  .sec-all:hover { color:var(--primary-text-color); }
+  button.sec-head { width:100%; background:none; border:none; border-bottom:1px solid var(--divider-color);
+    padding:0 0 6px 0; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .sec-head:focus-visible, .sec-all:focus-visible { outline:2px solid var(--primary-color); outline-offset:2px; }
+  .sec-chev { --mdc-icon-size:20px; color:var(--secondary-text-color); transition:transform .2s ease; flex-shrink:0; }
+  .sec-head[aria-expanded="false"] .sec-chev { transform:rotate(-90deg); }
+  .sec-body[hidden] { display:none !important; }`;
+const pgSec = (id, title, body) =>
+  '<div class="sec"><button type="button" class="sec-head" data-sec="' + id + '" aria-expanded="false" aria-controls="sec-' + id + '">' +
+  '<ha-icon class="sec-chev" icon="mdi:chevron-down"></ha-icon><span class="sec-title">' + gEsc(title) + "</span></button>" +
+  '<div class="sec-body" id="sec-' + id + '" hidden>' + body + "</div></div>";
+/* Wires headers + "expand/collapse all"; the first section is open by default, the others closed */
+function pgWireSections(root, tag, t) {
+  const heads = Array.from(root.querySelectorAll(".sec-head"));
+  const all = root.querySelector(".sec-all");
+  const sync = () => {
+    all.textContent = t(heads.some((h) => h.getAttribute("aria-expanded") !== "true") ? "expand_all" : "collapse_all");
+  };
+  const set = (h, open) => {
+    h.setAttribute("aria-expanded", String(open));
+    root.getElementById(h.getAttribute("aria-controls")).hidden = !open;
+    PG_SEC_STATE.set(tag + ":" + h.dataset.sec, open);
+  };
+  heads.forEach((h, i) => {
+    const k = tag + ":" + h.dataset.sec;
+    set(h, PG_SEC_STATE.has(k) ? PG_SEC_STATE.get(k) : i === 0);
+    h.addEventListener("click", () => { set(h, h.getAttribute("aria-expanded") !== "true"); sync(); });
+  });
+  all.addEventListener("click", () => {
+    const open = heads.some((h) => h.getAttribute("aria-expanded") !== "true");
+    heads.forEach((h) => set(h, open)); sync();
+  });
+  sync();
+}
+
 class ProxmoxGuestsCardEditor extends HTMLElement {
   setConfig(cfg) {
     this._config = JSON.parse(JSON.stringify(cfg || {}));
+    if (!this._hass) return;
     if (!this._built) { this._build(); this._built = true; }
     this._update();
   }
   set hass(h) {
-    const first = !this._hass; this._hass = h;
-    if (!this._built) return;
-    if (first) this._update(); else this._refreshHass();
+    this._hass = h;
+    if (!this._config) return;
+    /* Built once hass is known so the UI language is right from the start */
+    if (!this._built) { this._build(); this._built = true; this._update(); }
+    else this._refreshHass();
   }
   _refreshHass() { this.shadowRoot.querySelectorAll("ha-form").forEach((f) => { f.hass = this._hass; }); }
   _setColor(sel, v) {
@@ -426,9 +609,11 @@ class ProxmoxGuestsCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config: this._config }, bubbles: true, composed: true }));
   }
-  _label(s) { return PG_L[s.name] || s.name; }
+  _t(k, a) { return gT(this._hass, k, a); }
+  _label(s) { return this._t(s.name.indexOf("a_") === 0 ? "act_" + s.name.slice(2) : s.name); }
 
   _build() {
+    const t = (k) => gEsc(this._t(k));
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
@@ -458,34 +643,38 @@ class ProxmoxGuestsCardEditor extends HTMLElement {
           color:var(--primary-text-color); user-select:none; }
         .addbtn:hover { background:var(--divider-color); }
         .empty { font-size:12px; color:var(--secondary-text-color); font-style:italic; margin-bottom:10px; }
+        ${PG_SEC_CSS}
       </style>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Général</span></div>
-        <ha-form class="f-gen"></ha-form></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Couleurs</span></div>
+      <div class="sec-tools"><button type="button" class="sec-all"></button></div>
+      ${pgSec("general", this._t("s_general"), `<ha-form class="f-gen"></ha-form>`)}
+      ${pgSec("colors", this._t("s_colors"), `
         <div class="colors">
-          <div class="color-field"><input type="color" class="c-accent"><label>Accent</label></div>
-          <div class="color-field"><input type="color" class="c-on"><label>En marche</label></div>
-        </div></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Invités</span></div>
-        <div class="sec-hint">Les boutons s'adaptent à l'état : « Démarrer » quand l'invité est arrêté, « Éteindre / Forcer / Redémarrer » quand il tourne. Laisse vide les actions que ton type d'invité n'a pas.</div>
+          <div class="color-field"><input type="color" class="c-accent"><label>${t("c_accent")}</label></div>
+          <div class="color-field"><input type="color" class="c-on"><label>${t("c_on")}</label></div>
+        </div>`)}
+      ${pgSec("guests", this._t("s_guests"), `
+        <div class="sec-hint">${t("hint_guests")}</div>
         <div class="rows-guests"></div>
-        <div class="addbtn add-guest"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter un invité</span></div></div>
+        <div class="addbtn add-guest"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add_guest")}</span></div>`)}
     `;
     const r = this.shadowRoot;
+    pgWireSections(r, this.tagName.toLowerCase(), (k) => this._t(k));
     const f = r.querySelector(".f-gen");
-    f.schema = PG_S_GEN; f.computeLabel = this._label;
+    f.schema = PG_S_GEN((k) => this._t(k)); f.computeLabel = (s) => this._label(s);
     f.addEventListener("value-changed", (e) => {
       e.stopPropagation();
       Object.assign(this._config, e.detail.value);
       if (this._config.title === "") delete this._config.title;
+      if (!this._config.node) delete this._config.node;
+      if (!this._config.guest_type || this._config.guest_type === "all") delete this._config.guest_type;
       this._emit();
     });
     const bind = (sel, key) => {
       const el = r.querySelector(sel);
       const apply = (v) => { this._config[key] = v; this._emit(); };
-      let t = null;
-      el.addEventListener("input", (e) => { const v = e.target.value; clearTimeout(t); t = setTimeout(() => apply(v), 200); });
-      el.addEventListener("change", (e) => { clearTimeout(t); apply(e.target.value); });
+      let tm = null;
+      el.addEventListener("input", (e) => { const v = e.target.value; clearTimeout(tm); tm = setTimeout(() => apply(v), 200); });
+      el.addEventListener("change", (e) => { clearTimeout(tm); apply(e.target.value); });
     };
     bind(".c-accent", "accent");
     bind(".c-on", "color_on");
@@ -506,6 +695,7 @@ class ProxmoxGuestsCardEditor extends HTMLElement {
       show_bars: c.show_bars !== false,
       show_network: c.show_network !== false,
       show_uptime: c.show_uptime !== false,
+      node: c.node || "", guest_type: c.guest_type || "all",
     };
     this._setColor(".c-accent", c.accent || "#378ADD");
     this._setColor(".c-on", c.color_on || "#1D9E75");
@@ -517,7 +707,7 @@ class ProxmoxGuestsCardEditor extends HTMLElement {
       box.innerHTML = "";
       if (!list.length) {
         const e = document.createElement("div");
-        e.className = "empty"; e.textContent = "Aucun invité.";
+        e.className = "empty"; e.textContent = this._t("empty");
         box.appendChild(e);
       }
       list.forEach((it, i) => box.appendChild(this._row(it, i, list.length)));
@@ -550,7 +740,7 @@ class ProxmoxGuestsCardEditor extends HTMLElement {
     head.className = "row-head";
     const num = document.createElement("span");
     num.className = "row-num";
-    num.textContent = (item.name || "Invité #" + (index + 1)) + (item.vmid ? " · " + item.vmid : "");
+    num.textContent = (item.name || this._t("guest_n", index + 1)) + (item.vmid ? " · " + item.vmid : "");
     head.appendChild(num);
     const mk = (icon, cls, fn, dis) => {
       const b = document.createElement("ha-icon-button");
@@ -568,7 +758,7 @@ class ProxmoxGuestsCardEditor extends HTMLElement {
 
     const fg = document.createElement("ha-form");
     fg.className = "f-guest";
-    fg.schema = PG_S_GUEST; fg.computeLabel = this._label; fg.hass = this._hass;
+    fg.schema = PG_S_GUEST; fg.computeLabel = (s) => this._label(s); fg.hass = this._hass;
     fg.data = this._guestData(item);
     fg.addEventListener("value-changed", (e) => {
       e.stopPropagation();
@@ -583,12 +773,12 @@ class ProxmoxGuestsCardEditor extends HTMLElement {
 
     const lbl = document.createElement("div");
     lbl.className = "sub-lbl";
-    lbl.textContent = "Boutons d'action";
+    lbl.textContent = this._t("buttons");
     row.appendChild(lbl);
 
     const fa = document.createElement("ha-form");
     fa.className = "f-acts";
-    fa.schema = PG_S_ACTS; fa.computeLabel = this._label; fa.hass = this._hass;
+    fa.schema = PG_S_ACTS; fa.computeLabel = (s) => this._label(s); fa.hass = this._hass;
     fa.data = this._actsData(item);
     fa.addEventListener("value-changed", (e) => {
       e.stopPropagation();
@@ -621,59 +811,42 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "proxmox-guests-card",
   name: "Proxmox Guests Card",
-  description: "VM et conteneurs LXC : état, ressources et actions contextuelles.",
+  description: gDict(document.documentElement.lang || navigator.language || "en").desc,
 });
 console.info("%c PROXMOX-GUESTS-CARD %c v" + PGUEST_VERSION + " ",
   "color:#fff;background:#378ADD;font-weight:700", "color:#378ADD;background:#222");
 
 /* ============================================================
-EXEMPLE — MACHINES VIRTUELLES
+CONFIG EXAMPLES
+
+Minimal (auto-detection through the proxmoxve integration):
 
 type: custom:proxmox-guests-card
-title: Machines virtuelles
+title: Virtual machines
+guest_type: qemu          # all | qemu | lxc
+node: example-node        # optional, only needed with several nodes
+
+Explicit (entity IDs are placeholders, use your own):
+
+type: custom:proxmox-guests-card
+title: Virtual machines
 icon: mdi:server
 accent: "#378ADD"
 guests:
-  - name: docker01
-    vmid: 101
-    status: binary_sensor.qemu_docker01_101_status
-    status_text: sensor.qemu_docker01_101_status
-    health: binary_sensor.qemu_docker01_101_health
-    cpu: sensor.qemu_docker01_101_cpu_used
-    memory: sensor.qemu_docker01_101_memory_used_percentage
-    disk: sensor.qemu_docker01_101_disk_used_percentage
-    network_in: sensor.qemu_docker01_101_network_in
-    network_out: sensor.qemu_docker01_101_network_out
-    last_boot: sensor.qemu_docker01_101_last_boot
+  - name: example-vm
+    vmid: 100
+    status: binary_sensor.qemu_example_vm_100_status
+    status_text: sensor.qemu_example_vm_100_status
+    health: binary_sensor.qemu_example_vm_100_health
+    cpu: sensor.qemu_example_vm_100_cpu_used
+    memory: sensor.qemu_example_vm_100_memory_used_percentage
+    disk: sensor.qemu_example_vm_100_disk_used_percentage
+    network_in: sensor.qemu_example_vm_100_network_in
+    network_out: sensor.qemu_example_vm_100_network_out
+    last_boot: sensor.qemu_example_vm_100_last_boot
     actions:
-      start: button.qemu_docker01_101_start
-      shutdown: button.qemu_docker01_101_shutdown
-      stop: button.qemu_docker01_101_stop
-      reboot: button.qemu_docker01_101_reboot
-      reset: button.qemu_docker01_101_reset
-      suspend: button.qemu_docker01_101_suspend
-      resume: button.qemu_docker01_101_resume
-      hibernate: button.qemu_docker01_101_hibernate
-
-EXEMPLE — CONTENEURS LXC
-
-type: custom:proxmox-guests-card
-title: Conteneurs LXC
-icon: mdi:package-variant-closed
-accent: "#7F77DD"
-guests:
-  - name: DNSINTERNE
-    vmid: 110
-    status: binary_sensor.lxc_dnsinterne_110_status
-    cpu: sensor.lxc_dnsinterne_110_cpu_used
-    memory: sensor.lxc_dnsinterne_110_memory_used_percentage
-    disk: sensor.lxc_dnsinterne_110_disk_used_percentage
-    network_in: sensor.lxc_dnsinterne_110_network_in
-    network_out: sensor.lxc_dnsinterne_110_network_out
-    last_boot: sensor.lxc_dnsinterne_110_last_boot
-    actions:
-      start: button.lxc_dnsinterne_110_start
-      shutdown: button.lxc_dnsinterne_110_shutdown
-      stop: button.lxc_dnsinterne_110_stop
-      reboot: button.lxc_dnsinterne_110_reboot
+      start: button.qemu_example_vm_100_start
+      shutdown: button.qemu_example_vm_100_shutdown
+      stop: button.qemu_example_vm_100_stop
+      reboot: button.qemu_example_vm_100_reboot
 ============================================================ */

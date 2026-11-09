@@ -1,14 +1,80 @@
 /**
- * Synology NAS Card — système DSM (CPU, mémoire, charge, débits, actions)
- * Version 1.0.0
+ * Synology NAS Card — DSM system (CPU, memory, load, throughput, actions)
+ * Version 1.1.0
  *
- * Installation :
- *  1. config/www/perso/synology-nas-card.js
- *  2. Resources → /local/perso/synology-nas-card.js?v=1 → JavaScript Module
- *  3. Ctrl+Shift+R
+ * Works with the native Home Assistant "synology_dsm" integration.
+ * Entities left unset are auto-detected (platform + translation_key, never
+ * display names) when a NAS device is chosen or when nothing is configured.
  */
 
-const SYNAS_VERSION = "1.0.0";
+const SYNAS_VERSION = "1.1.0";
+
+/* ---------- i18n ---------- */
+const SN_I18N = {
+  fr: {
+    booted: "Démarré il y a {d}", secure: "Sécurisé", sec_alert: "Alerte sécurité",
+    upd_avail: "MAJ DSM", upd_ok: "DSM à jour",
+    download: "Téléchargement", upload: "Téléversement", system: "Système",
+    confirm: "{a} le NAS « {t} » ?", cpu: "CPU", memory: "Mémoire",
+    reboot: "Redémarrer", shutdown: "Arrêter",
+    sec_gen: "Général", sec_colors: "Couleurs", sec_gauges: "Jauges",
+    sec_flow: "Débits réseau", sec_actions: "Actions",
+    expand_all: "Tout déplier", collapse_all: "Tout replier",
+    c_normal: "Normal", c_alert: "Alerte", color: "Couleur", empty: "Aucun élément.",
+    add_gauge: "Ajouter une jauge", add_action: "Ajouter une action",
+    hint_auto: "Choisis un NAS Synology : les champs laissés vides (entités, jauges, débits, actions) sont détectés automatiquement.",
+    hint_gauges: "Plusieurs sources possibles par jauge : un pourcentage direct, ou « Disponible + Total » (cas de la mémoire Synology), ou « Valeur brute + Max » (cas de la charge processeur).",
+    hint_actions: "La confirmation est activée par défaut : arrêter un NAS à distance sans filet est risqué.",
+    l_device_id: "NAS Synology (détection auto)",
+    l_title: "Titre", l_icon: "Icône", l_subtitle: "Sous-titre libre",
+    l_security_entity: "État de sécurité", l_security_invert: "Inverser l'état de sécurité",
+    l_last_boot: "Dernier démarrage", l_update_entity: "Mise à jour DSM",
+    l_temperature: "Température système",
+    l_warn_at: "Seuil d'alerte (%)", l_critical_at: "Seuil critique (%)",
+    l_temp_warn: "Température d'alerte (°C)", l_temp_critical: "Température critique (°C)",
+    l_name: "Nom affiché", l_percentage: "Pourcentage", l_value: "Valeur brute",
+    l_max: "Valeur max (échelle)", l_used: "Utilisé", l_free: "Disponible", l_total: "Total",
+    l_download: "Débit descendant", l_upload: "Débit montant",
+    l_entity: "Entité", l_confirm: "Demander confirmation",
+    l_actions_label: "Titre de la zone d'actions",
+  },
+  en: {
+    booted: "Started {d} ago", secure: "Secure", sec_alert: "Security alert",
+    upd_avail: "DSM update", upd_ok: "DSM up to date",
+    download: "Download", upload: "Upload", system: "System",
+    confirm: "{a} the NAS “{t}”?", cpu: "CPU", memory: "Memory",
+    reboot: "Reboot", shutdown: "Shut down",
+    sec_gen: "General", sec_colors: "Colors", sec_gauges: "Gauges",
+    sec_flow: "Network throughput", sec_actions: "Actions",
+    expand_all: "Expand all", collapse_all: "Collapse all",
+    c_normal: "Normal", c_alert: "Alert", color: "Color", empty: "No items.",
+    add_gauge: "Add a gauge", add_action: "Add an action",
+    hint_auto: "Pick a Synology NAS: fields left empty (entities, gauges, throughput, actions) are detected automatically.",
+    hint_gauges: "Several sources per gauge: a direct percentage, or “Free + Total” (Synology memory), or “Raw value + Max” (CPU load).",
+    hint_actions: "Confirmation is on by default: shutting down a NAS remotely without a safety net is risky.",
+    l_device_id: "Synology NAS (auto-detection)",
+    l_title: "Title", l_icon: "Icon", l_subtitle: "Custom subtitle",
+    l_security_entity: "Security status", l_security_invert: "Invert security status",
+    l_last_boot: "Last boot", l_update_entity: "DSM update",
+    l_temperature: "System temperature",
+    l_warn_at: "Warning threshold (%)", l_critical_at: "Critical threshold (%)",
+    l_temp_warn: "Warning temperature (°C)", l_temp_critical: "Critical temperature (°C)",
+    l_name: "Display name", l_percentage: "Percentage", l_value: "Raw value",
+    l_max: "Max value (scale)", l_used: "Used", l_free: "Free", l_total: "Total",
+    l_download: "Download rate", l_upload: "Upload rate",
+    l_entity: "Entity", l_confirm: "Ask for confirmation",
+    l_actions_label: "Actions area title",
+  },
+};
+const nLocale = (h) => (h && ((h.locale && h.locale.language) || h.language)) || "en";
+const nLang = (h) => (String(nLocale(h)).toLowerCase().indexOf("fr") === 0 ? "fr" : "en");
+function snT(lang, k, vars) {
+  let s = SN_I18N[lang][k];
+  if (s === undefined) s = SN_I18N.en[k] !== undefined ? SN_I18N.en[k] : k;
+  return vars ? s.replace(/\{(\w+)\}/g, (_, v) => vars[v]) : s;
+}
+/* Shared by all instances: every card on a page receives the same hass locale. */
+let N_LOC = "en";
 
 /* ---------- Helpers ---------- */
 const nRgba = (c, a) => {
@@ -26,13 +92,13 @@ const nFmt = (st, d) => {
   if (!st) return "—";
   const n = parseFloat(st.state);
   if (isNaN(n)) return st.state;
-  return n.toLocaleString("fr-FR", { maximumFractionDigits: d === undefined ? 1 : d });
+  return n.toLocaleString(N_LOC, { maximumFractionDigits: d === undefined ? 1 : d });
 };
 const nUnit = (st) => (st && st.attributes ? st.attributes.unit_of_measurement || "" : "");
 const nEsc = (s) => String(s).replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-/* Met une valeur d'octets à l'échelle : 4200 GB → 4,2 TB */
+/* Scales a byte value: 4200 GB -> 4.2 TB */
 function nScale(value, unit) {
   if (isNaN(value)) return null;
   const dec = ["B", "kB", "KB", "MB", "GB", "TB", "PB"];
@@ -43,30 +109,32 @@ function nScale(value, unit) {
   let v = value;
   while (Math.abs(v) >= base && i < seq.length - 1) { v /= base; i++; }
   const d = Math.abs(v) >= 100 ? 0 : Math.abs(v) >= 10 ? 1 : 2;
-  return v.toLocaleString("fr-FR", { maximumFractionDigits: d }) + " " + seq[i];
+  return v.toLocaleString(N_LOC, { maximumFractionDigits: d }) + " " + seq[i];
 }
 
-/* Convertit un horodatage en durée lisible */
+/* Turns a timestamp into a readable, localized duration */
 function nSince(raw) {
   if (!raw) return null;
   const t = Date.parse(raw);
   if (isNaN(t)) return null;
   const sec = Math.floor((Date.now() - t) / 1000);
   if (sec < 0) return null;
+  const u = (n, unit, long) => new Intl.NumberFormat(N_LOC,
+    { style: "unit", unit: unit, unitDisplay: long ? "long" : "short" }).format(n);
   const d = Math.floor(sec / 86400);
   if (d >= 365) {
     const y = Math.floor(d / 365), mo = Math.floor((d % 365) / 30);
-    return y + " an" + (y > 1 ? "s" : "") + (mo ? " " + mo + " mois" : "");
+    return u(y, "year", true) + (mo ? " " + u(mo, "month", true) : "");
   }
-  if (d >= 30) { const mo = Math.floor(d / 30); return mo + " mois"; }
-  if (d >= 1) return d + " jour" + (d > 1 ? "s" : "");
+  if (d >= 30) return u(Math.floor(d / 30), "month", true);
+  if (d >= 1) return u(d, "day", true);
   const h = Math.floor(sec / 3600);
-  if (h >= 1) return h + " h";
-  return Math.max(1, Math.floor(sec / 60)) + " min";
+  if (h >= 1) return u(h, "hour");
+  return u(Math.max(1, Math.floor(sec / 60)), "minute");
 }
 
-/* Lecture d'un binary_sensor en tenant compte de device_class "problem",
-   où "on" signifie qu'un problème est détecté. */
+/* Reads a binary_sensor honoring device_class "problem"/"safety",
+   where "on" means a problem is detected. */
 function nOk(st, invert) {
   if (!st) return null;
   const s = String(st.state).toLowerCase();
@@ -81,29 +149,111 @@ function nOk(st, invert) {
   return null;
 }
 
+/* ---------- synology_dsm auto-detection ---------- */
+const N_ENTITY_KEYS = ["security_entity", "last_boot", "update_entity", "temperature",
+  "gauges", "throughput", "actions"];
+/* Keys only present on the main NAS device (volumes/disks are child devices). */
+const N_MAIN_KEYS = ["cpu_total_load", "memory_real_usage", "network_up", "network_down", "status", "shutdown"];
+
+function nDetect(hass, deviceId) {
+  const devs = hass.devices || {};
+  const ents = Object.values(hass.entities || {})
+    .filter((e) => e.platform === "synology_dsm" && e.device_id);
+  let dev = deviceId;
+  if (dev && devs[dev] && devs[dev].via_device_id) dev = devs[dev].via_device_id; /* volume/disk picked */
+  if (!dev) {
+    const e = ents.find((x) => N_MAIN_KEYS.indexOf(x.translation_key) !== -1);
+    dev = e && e.device_id;
+  }
+  if (!dev) return null;
+  const own = ents.filter((e) => e.device_id === dev);
+  const dc = (e) => {
+    const s = hass.states[e.entity_id];
+    return s && s.attributes ? s.attributes.device_class : undefined;
+  };
+  const pick = (domain, test) => {
+    const e = own.find((x) => x.entity_id.split(".")[0] === domain && test(x));
+    return e ? e.entity_id : undefined;
+  };
+  const tk = (k) => (e) => e.translation_key === k;
+  const d = devs[dev] || {};
+  return {
+    name: d.name_by_user || d.name,
+    security_entity: pick("binary_sensor", tk("status")),
+    last_boot: pick("sensor", (e) => !e.translation_key && ["timestamp", "uptime"].indexOf(dc(e)) !== -1),
+    update_entity: pick("update", () => true),
+    temperature: pick("sensor", (e) => !e.translation_key && dc(e) === "temperature"),
+    cpu: pick("sensor", tk("cpu_total_load")),
+    mem: pick("sensor", tk("memory_real_usage")),
+    mem_free: pick("sensor", tk("memory_available_real")),
+    mem_total: pick("sensor", tk("memory_total_real")),
+    down: pick("sensor", tk("network_down")),
+    up: pick("sensor", tk("network_up")),
+    reboot: pick("button", (e) => dc(e) === "restart"),
+    shutdown: pick("button", tk("shutdown")),
+  };
+}
+
+function nBase(config) {
+  return {
+    title: config.title || "NAS",
+    icon: config.icon || "mdi:nas",
+    accent: config.accent || "#378ADD",
+    accent_off: config.accent_off || "#E24B4A",
+    warn_at: config.warn_at || 75,
+    critical_at: config.critical_at || 90,
+    temp_warn: config.temp_warn || 50,
+    temp_critical: config.temp_critical || 60,
+    security_entity: config.security_entity || null,
+    security_invert: config.security_invert,
+    last_boot: config.last_boot || null,
+    update_entity: config.update_entity || null,
+    temperature: config.temperature || null,
+    subtitle: config.subtitle || null,
+    gauges: config.gauges || [],
+    throughput: config.throughput || null,
+    actions_label: config.actions_label || null,
+    actions: config.actions || [],
+  };
+}
+
 class SynologyNasCard extends HTMLElement {
   setConfig(config) {
-    this._config = {
-      title: config.title || "NAS",
-      icon: config.icon || "mdi:nas",
-      accent: config.accent || "#378ADD",
-      accent_off: config.accent_off || "#E24B4A",
-      warn_at: config.warn_at || 75,
-      critical_at: config.critical_at || 90,
-      temp_warn: config.temp_warn || 50,
-      temp_critical: config.temp_critical || 60,
-      security_entity: config.security_entity || null,
-      security_invert: config.security_invert,
-      last_boot: config.last_boot || null,
-      update_entity: config.update_entity || null,
-      temperature: config.temperature || null,
-      subtitle: config.subtitle || null,
-      gauges: config.gauges || [],
-      throughput: config.throughput || null,
-      actions_label: config.actions_label || null,
-      actions: config.actions || [],
-    };
+    this._user = config;
+    this._config = nBase(config);
+    /* Explicit keys always win; detection only fills unset keys. */
+    this._auto = !!config.device_id || !N_ENTITY_KEYS.some((k) => config[k] !== undefined);
+    this._entRef = undefined;
     this._built = false;
+  }
+
+  /* Fills unset keys from the detected NAS device. */
+  _resolve(hass) {
+    const u = this._user, c = nBase(u), d = nDetect(hass, u.device_id);
+    if (d) {
+      const L = nLang(hass);
+      if (!u.title && d.name) c.title = d.name;
+      ["security_entity", "last_boot", "update_entity", "temperature"].forEach((k) => {
+        if (u[k] === undefined && d[k]) c[k] = d[k];
+      });
+      if (u.gauges === undefined) {
+        const g = [];
+        if (d.cpu) g.push({ name: snT(L, "cpu"), percentage: d.cpu, color: "#378ADD" });
+        if (d.mem || (d.mem_free && d.mem_total)) {
+          g.push({ name: snT(L, "memory"), percentage: d.mem, free: d.mem_free,
+                   total: d.mem_total, color: "#7F77DD" });
+        }
+        c.gauges = g;
+      }
+      if (u.throughput === undefined && (d.down || d.up)) c.throughput = { download: d.down, upload: d.up };
+      if (u.actions === undefined) {
+        const a = [];
+        if (d.reboot) a.push({ name: snT(L, "reboot"), entity: d.reboot, icon: "mdi:restart", color: "#378ADD" });
+        if (d.shutdown) a.push({ name: snT(L, "shutdown"), entity: d.shutdown, icon: "mdi:power", color: "#E24B4A" });
+        c.actions = a;
+      }
+    }
+    this._config = c;
   }
 
   connectedCallback() {
@@ -115,10 +265,16 @@ class SynologyNasCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    N_LOC = nLocale(hass);
+    this._lang = nLang(hass);
+    if (this._auto && hass.entities !== this._entRef) {
+      this._entRef = hass.entities; this._resolve(hass); this._last = null;
+    }
     if (!this._built) { this._build(); this._built = true; }
     const sig = this._sig(hass);
     if (sig !== this._last) { this._last = sig; this._render(); }
   }
+  _t(k, vars) { return snT(this._lang || "en", k, vars); }
 
   _ids() {
     const c = this._config, ids = [];
@@ -151,8 +307,8 @@ class SynologyNasCard extends HTMLElement {
     return "#1D9E75";
   }
 
-  /* Une jauge accepte plusieurs sources : pourcentage direct, valeur/max,
-     utilisé/total, ou libre/total (le cas Synology pour la mémoire). */
+  /* A gauge accepts several sources: direct percentage, value/max,
+     used/total, or free/total (the Synology memory case). */
   _gaugeValue(g) {
     const hass = this._hass;
     const pctSt = g.percentage ? hass.states[g.percentage] : null;
@@ -173,14 +329,14 @@ class SynologyNasCard extends HTMLElement {
       if (!isNaN(v)) pct = (v / g.max) * 100;
     }
 
-    /* Libellé de droite : le plus parlant disponible */
+    /* Right-hand label: the most meaningful one available */
     let label;
     if (!isNaN(used) && !isNaN(total)) {
       const unit = nUnit(totSt) || nUnit(usedSt) || nUnit(freeSt);
       const su = nScale(used, unit), st_ = nScale(total, unit);
       label = (su && st_) ? su.split(" ")[0] + "/" + st_
-        : used.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + "/" +
-          total.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " " + unit;
+        : used.toLocaleString(N_LOC, { maximumFractionDigits: 1 }) + "/" +
+          total.toLocaleString(N_LOC, { maximumFractionDigits: 0 }) + " " + unit;
     } else if (valSt) {
       label = nFmt(valSt, 2) + (nUnit(valSt) ? " " + nUnit(valSt) : "");
     } else {
@@ -190,7 +346,7 @@ class SynologyNasCard extends HTMLElement {
   }
 
   _build() {
-    this.attachShadow({ mode: "open" });
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
         ha-card { border-radius:14px; padding:0; overflow:hidden;
@@ -281,7 +437,7 @@ class SynologyNasCard extends HTMLElement {
     const since = st ? nSince(st.state) : null;
     if (since) {
       sub.classList.remove("hidden");
-      sub.querySelector("span").textContent = "Démarré il y a " + since;
+      sub.querySelector("span").textContent = this._t("booted", { d: since });
       sub.onclick = () => this._more(c.last_boot);
     } else sub.classList.add("hidden");
   }
@@ -308,25 +464,25 @@ class SynologyNasCard extends HTMLElement {
     const bits = [];
     if (secOk !== null) {
       bits.push('<b style="color:' + (secOk ? "#1D9E75" : "#E24B4A") + '">' +
-        (secOk ? "Sécurisé" : "Alerte sécurité") + "</b>");
+        nEsc(this._t(secOk ? "secure" : "sec_alert")) + "</b>");
     }
     if (c.subtitle) bits.push(nEsc(c.subtitle));
     r.querySelector(".hsub").innerHTML = bits.length ? bits.join(" · ") : "&nbsp;";
 
     this._renderUptime();
 
-    /* Badge DSM */
+    /* DSM badge */
     const badge = r.querySelector(".badge");
     if (c.update_entity && hass.states[c.update_entity]) {
       const up = hass.states[c.update_entity].state === "on";
       badge.classList.remove("hidden");
-      badge.textContent = up ? "MAJ DSM" : "DSM à jour";
+      badge.textContent = this._t(up ? "upd_avail" : "upd_ok");
       badge.style.background = nRgba(up ? "#BA7517" : "#1D9E75", 0.12);
       badge.style.color = up ? "#BA7517" : "#1D9E75";
       badge.onclick = (e) => { e.stopPropagation(); this._more(c.update_entity); };
     } else badge.classList.add("hidden");
 
-    /* Jauges */
+    /* Gauges */
     const gz = r.querySelector(".gauges");
     if (c.gauges.length) {
       gz.classList.remove("hidden");
@@ -348,7 +504,7 @@ class SynologyNasCard extends HTMLElement {
       });
     } else gz.classList.add("hidden");
 
-    /* Débits + température */
+    /* Throughput + temperature */
     const flow = r.querySelector(".flow");
     const tp = c.throughput;
     const hasFlow = tp && (tp.download || tp.upload);
@@ -363,13 +519,13 @@ class SynologyNasCard extends HTMLElement {
         d.innerHTML =
           '<div class="fhead"><ha-icon icon="' + icon + '" style="color:' + color + '"></ha-icon>' +
           "<span>" + nEsc(label) + "</span></div>" +
-          '<div class="fval">' + nFmt(st, 2) +
+          '<div class="fval">' + nEsc(nFmt(st, 2)) +
             (nUnit(st) ? "<em>" + nEsc(nUnit(st)) + "</em>" : "") + "</div>";
         d.addEventListener("click", () => this._more(entity));
         flow.appendChild(d);
       };
-      if (tp && tp.download) mk(tp.download, tp.download_label || "Téléchargement", "mdi:arrow-down", c.accent);
-      if (tp && tp.upload) mk(tp.upload, tp.upload_label || "Téléversement", "mdi:arrow-up", "#1D9E75");
+      if (tp && tp.download) mk(tp.download, tp.download_label || this._t("download"), "mdi:arrow-down", c.accent);
+      if (tp && tp.upload) mk(tp.upload, tp.upload_label || this._t("upload"), "mdi:arrow-up", "#1D9E75");
       if (hasTemp) {
         const st = hass.states[c.temperature];
         const t = nNum(st);
@@ -378,8 +534,8 @@ class SynologyNasCard extends HTMLElement {
         d.className = "tbox";
         d.innerHTML =
           '<ha-icon icon="mdi:thermometer" style="color:' + col + '"></ha-icon>' +
-          '<div class="tv">' + nFmt(st, 0) + "°</div>" +
-          '<div class="tn">Système</div>';
+          '<div class="tv">' + nEsc(nFmt(st, 0)) + "°</div>" +
+          '<div class="tn">' + nEsc(this._t("system")) + "</div>";
         d.addEventListener("click", () => this._more(c.temperature));
         flow.appendChild(d);
       }
@@ -398,11 +554,12 @@ class SynologyNasCard extends HTMLElement {
         const el = document.createElement("div");
         el.className = "action";
         el.innerHTML =
-          (a.icon ? '<ha-icon icon="' + a.icon + '" style="color:' + (a.color || "inherit") + '"></ha-icon>' : "") +
-          "<span>" + nEsc(a.name) + "</span>";
+          (a.icon ? '<ha-icon icon="' + nEsc(a.icon) + '" style="color:' + (a.color || "inherit") + '"></ha-icon>' : "") +
+          "<span>" + nEsc(a.name || "") + "</span>";
         el.addEventListener("click", () => {
+          if (!a.entity) return;
           if (a.confirm !== false &&
-              !window.confirm(a.confirm_text || (a.name + " le NAS « " + c.title + " » ?"))) return;
+              !window.confirm(a.confirm_text || this._t("confirm", { a: a.name || "", t: c.title }))) return;
           const domain = a.entity.split(".")[0];
           const svc = domain === "button" ? "press" : domain === "switch" ? "toggle" : "turn_on";
           this._hass.callService(domain, svc, { entity_id: a.entity });
@@ -426,28 +583,60 @@ class SynologyNasCard extends HTMLElement {
     return 2 + Math.ceil(c.gauges.length / 2) +
       ((c.throughput || c.temperature) ? 1 : 0) + (c.actions.length ? 1 : 0);
   }
-  static getStubConfig() { return { type: "custom:synology-nas-card", title: "NAS" }; }
+  /* No entity in the stub: the card auto-detects the first Synology NAS. */
+  static getStubConfig() { return { type: "custom:synology-nas-card" }; }
   static getConfigElement() { return document.createElement("synology-nas-card-editor"); }
 }
 customElements.define("synology-nas-card", SynologyNasCard);
 
-/* ================= ÉDITEUR ================= */
-const SN_L = {
-  title: "Titre", icon: "Icône", subtitle: "Sous-titre libre",
-  security_entity: "État de sécurité", security_invert: "Inverser l'état de sécurité",
-  last_boot: "Dernier démarrage", update_entity: "Mise à jour DSM",
-  temperature: "Température système",
-  warn_at: "Seuil d'alerte (%)", critical_at: "Seuil critique (%)",
-  temp_warn: "Température d'alerte (°C)", temp_critical: "Température critique (°C)",
-  name: "Nom affiché", percentage: "Pourcentage", value: "Valeur brute",
-  max: "Valeur max (échelle)", used: "Utilisé", free: "Disponible", total: "Total",
-  download: "Débit descendant", upload: "Débit montant",
-  download_label: "Libellé descendant", upload_label: "Libellé montant",
-  entity: "Entité", confirm: "Demander confirmation",
-  actions_label: "Titre de la zone d'actions",
-};
+/* ================= EDITOR ================= */
+
+/* ---------- Collapsible sections (open state survives editor re-creation) ---------- */
+const SN_SEC_STATE = new Map(); /* `${tagName}:${sectionId}` -> open */
+const SN_SEC_CSS = `
+  .sec-tools { display:flex; justify-content:flex-end; gap:4px; margin-bottom:6px; }
+  .sec-tools button { background:none; border:none; cursor:pointer; padding:2px 6px;
+    border-radius:4px; font:inherit; font-size:12px; color:var(--secondary-text-color); }
+  .sec-tools button:hover { color:var(--primary-text-color); }
+  .sec-head { width:100%; display:flex; align-items:center; gap:8px; margin:0 0 10px 0;
+    padding:0 0 6px 0; background:none; border:none; border-bottom:1px solid var(--divider-color);
+    cursor:pointer; font:inherit; text-align:left; color:var(--primary-text-color); }
+  .sec-head[aria-expanded="false"] { margin-bottom:0; }
+  .sec-head:focus-visible, .sec-tools button:focus-visible {
+    outline:2px solid var(--primary-color); outline-offset:2px; border-radius:4px; }
+  .sec-head .chev { --mdc-icon-size:20px; color:var(--secondary-text-color); transition:transform .2s ease; }
+  .sec-head[aria-expanded="false"] .chev { transform:rotate(-90deg); }
+  .sec-body[hidden] { display:none; }
+`;
+const snSec = (id, title, body) =>
+  '<div class="sec" data-sec="' + id + '"><button type="button" class="sec-head" aria-controls="sec-' + id + '">' +
+  '<ha-icon class="chev" icon="mdi:chevron-down"></ha-icon><span class="sec-title">' + nEsc(title) + "</span></button>" +
+  '<div class="sec-body" id="sec-' + id + '">' + body + "</div></div>";
+const snSecTools = (L) =>
+  '<div class="sec-tools"><button type="button" class="sec-all" data-open="1">' + nEsc(snT(L, "expand_all")) +
+  '</button><button type="button" class="sec-all" data-open="0">' + nEsc(snT(L, "collapse_all")) + "</button></div>";
+/* First section open by default, the others collapsed. Only toggles `hidden`:
+   fields are never re-created, so focus and typed values are kept. */
+function snSecWire(root, tag) {
+  const secs = root.querySelectorAll(".sec");
+  const set = (sec, open) => {
+    SN_SEC_STATE.set(tag + ":" + sec.dataset.sec, open);
+    sec.querySelector(".sec-head").setAttribute("aria-expanded", String(open));
+    sec.querySelector(".sec-body").hidden = !open;
+  };
+  secs.forEach((sec, i) => {
+    const k = tag + ":" + sec.dataset.sec;
+    set(sec, SN_SEC_STATE.has(k) ? SN_SEC_STATE.get(k) : i === 0);
+    const head = sec.querySelector(".sec-head");
+    head.addEventListener("click", () => set(sec, head.getAttribute("aria-expanded") !== "true"));
+  });
+  root.querySelectorAll(".sec-all").forEach((b) =>
+    b.addEventListener("click", () => secs.forEach((s) => set(s, b.dataset.open === "1"))));
+}
+
 const SN_SENSOR = { entity: { filter: { domain: ["sensor"] } } };
 const SN_S_GEN = [
+  { name: "device_id", selector: { device: { filter: { integration: "synology_dsm" } } } },
   { type: "grid", schema: [
     { name: "title", selector: { text: {} } },
     { name: "icon", selector: { icon: {} } },
@@ -492,13 +681,11 @@ const SN_S_ACTION = [
 class SynologyNasCardEditor extends HTMLElement {
   setConfig(cfg) {
     this._config = JSON.parse(JSON.stringify(cfg || {}));
-    if (!this._built) { this._build(); this._built = true; }
     this._update();
   }
   set hass(h) {
     const first = !this._hass; this._hass = h;
-    if (!this._built) return;
-    if (first) this._update(); else this._refreshHass();
+    if (first || !this._built) this._update(); else this._refreshHass();
   }
   _refreshHass() { this.shadowRoot.querySelectorAll("ha-form").forEach((f) => { f.hass = this._hass; }); }
   _setColor(sel, v) {
@@ -510,15 +697,17 @@ class SynologyNasCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config: this._config }, bubbles: true, composed: true }));
   }
-  _label(s) { return SN_L[s.name] || s.name; }
+  _t(k) { return snT(this._lang, k); }
+  _label(s) { return snT(this._lang, "l_" + s.name); }
 
+  /* Built once hass is known, so the UI language is available. */
   _build() {
-    this.attachShadow({ mode: "open" });
+    this._lang = nLang(this._hass);
+    const t = (k) => nEsc(this._t(k));
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
         .sec { margin-bottom:18px; }
-        .sec-head { display:flex; align-items:center; gap:8px; margin-bottom:10px;
-          padding-bottom:6px; border-bottom:1px solid var(--divider-color); }
         .sec-title { font-size:15px; font-weight:600; color:var(--primary-text-color); flex:1; }
         .sec-hint { font-size:12px; color:var(--secondary-text-color); margin:-4px 0 10px 0; line-height:1.4; }
         .colors { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
@@ -540,35 +729,38 @@ class SynologyNasCardEditor extends HTMLElement {
           color:var(--primary-text-color); user-select:none; }
         .addbtn:hover { background:var(--divider-color); }
         .empty { font-size:12px; color:var(--secondary-text-color); font-style:italic; margin-bottom:10px; }
+        ${SN_SEC_CSS}
       </style>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Général</span></div>
-        <ha-form class="f-gen"></ha-form></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Couleurs</span></div>
+      ${snSecTools(this._lang)}
+      ${snSec("gen", this._t("sec_gen"), `
+        <div class="sec-hint">${t("hint_auto")}</div>
+        <ha-form class="f-gen"></ha-form>`)}
+      ${snSec("colors", this._t("sec_colors"), `
         <div class="colors">
-          <div class="color-field"><input type="color" class="c-on"><label>Normal</label></div>
-          <div class="color-field"><input type="color" class="c-off"><label>Alerte</label></div>
-        </div></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Jauges</span></div>
-        <div class="sec-hint">Plusieurs sources possibles par jauge : un pourcentage direct, ou « Disponible + Total » (cas de la mémoire Synology), ou « Valeur brute + Max » (cas de la charge processeur).</div>
+          <div class="color-field"><input type="color" class="c-on"><label>${t("c_normal")}</label></div>
+          <div class="color-field"><input type="color" class="c-off"><label>${t("c_alert")}</label></div>
+        </div>`)}
+      ${snSec("gauges", this._t("sec_gauges"), `
+        <div class="sec-hint">${t("hint_gauges")}</div>
         <div class="rows-gauges"></div>
-        <div class="addbtn add-gauge"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter une jauge</span></div></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Débits réseau</span></div>
-        <ha-form class="f-flow"></ha-form></div>
-      <div class="sec"><div class="sec-head"><span class="sec-title">Actions</span></div>
-        <div class="sec-hint">La confirmation est activée par défaut : arrêter un NAS à distance sans filet est risqué.</div>
+        <div class="addbtn add-gauge"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add_gauge")}</span></div>`)}
+      ${snSec("flow", this._t("sec_flow"), `<ha-form class="f-flow"></ha-form>`)}
+      ${snSec("actions", this._t("sec_actions"), `
+        <div class="sec-hint">${t("hint_actions")}</div>
         <ha-form class="f-actlabel"></ha-form>
         <div class="rows-actions"></div>
-        <div class="addbtn add-action"><ha-icon icon="mdi:plus"></ha-icon><span>Ajouter une action</span></div></div>
+        <div class="addbtn add-action"><ha-icon icon="mdi:plus"></ha-icon><span>${t("add_action")}</span></div>`)}
     `;
     const r = this.shadowRoot;
+    snSecWire(r, this.tagName.toLowerCase());
     const wire = (sel, schema, fn) => {
       const f = r.querySelector(sel);
-      f.schema = schema; f.computeLabel = this._label;
+      f.schema = schema; f.computeLabel = (s) => this._label(s);
       f.addEventListener("value-changed", (e) => { e.stopPropagation(); fn(e.detail.value); this._emit(); });
     };
     wire(".f-gen", SN_S_GEN, (v) => {
       Object.assign(this._config, v);
-      ["title", "subtitle", "security_entity", "last_boot", "update_entity", "temperature"]
+      ["device_id", "title", "subtitle", "security_entity", "last_boot", "update_entity", "temperature"]
         .forEach((k) => { if (this._config[k] === "" || this._config[k] === undefined) delete this._config[k]; });
       if (this._config.security_invert === false) delete this._config.security_invert;
     });
@@ -603,10 +795,12 @@ class SynologyNasCardEditor extends HTMLElement {
 
   _update(force) {
     if (!this._hass || !this._config) return;
+    if (!this._built) { this._build(); this._built = true; }
     const r = this.shadowRoot, c = this._config;
     const fg = r.querySelector(".f-gen");
     fg.hass = this._hass;
     fg.data = {
+      device_id: c.device_id || "",
       title: c.title || "", icon: c.icon || "mdi:nas", subtitle: c.subtitle || "",
       security_entity: c.security_entity || "", security_invert: c.security_invert === true,
       last_boot: c.last_boot || "", update_entity: c.update_entity || "",
@@ -635,7 +829,7 @@ class SynologyNasCardEditor extends HTMLElement {
       box.innerHTML = "";
       if (!list.length) {
         const e = document.createElement("div");
-        e.className = "empty"; e.textContent = "Aucun élément.";
+        e.className = "empty"; e.textContent = this._t("empty");
         box.appendChild(e);
       }
       list.forEach((it, i) => box.appendChild(this._row(key, schema, it, i, list.length)));
@@ -672,7 +866,7 @@ class SynologyNasCardEditor extends HTMLElement {
     row.appendChild(head);
 
     const f = document.createElement("ha-form");
-    f.schema = schema; f.computeLabel = this._label; f.hass = this._hass;
+    f.schema = schema; f.computeLabel = (s) => this._label(s); f.hass = this._hass;
     f.data = Object.assign({}, item);
     f.addEventListener("value-changed", (e) => {
       e.stopPropagation();
@@ -680,7 +874,7 @@ class SynologyNasCardEditor extends HTMLElement {
       const m = Object.assign({}, l[index], e.detail.value);
       Object.keys(m).forEach((k) => {
         if (m[k] === "" || m[k] === undefined) delete m[k];
-        if (k === "confirm" && m[k] === true) delete m[k]; /* true = défaut */
+        if (k === "confirm" && m[k] === true) delete m[k]; /* true = default */
       });
       if (l[index] && l[index].color) m.color = l[index].color;
       l[index] = m; this._config[key] = l; this._emit();
@@ -700,7 +894,7 @@ class SynologyNasCardEditor extends HTMLElement {
       let t = null;
       ci.addEventListener("input", (e) => { const v = e.target.value; clearTimeout(t); t = setTimeout(() => apply(v), 200); });
       ci.addEventListener("change", (e) => { clearTimeout(t); apply(e.target.value); });
-      const cl = document.createElement("label"); cl.textContent = "Couleur";
+      const cl = document.createElement("label"); cl.textContent = this._t("color");
       cf.appendChild(ci); cf.appendChild(cl); row.appendChild(cf);
     }
     return row;
@@ -720,51 +914,48 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "synology-nas-card",
   name: "Synology NAS Card",
-  description: "NAS Synology : CPU, mémoire, débits, température et actions.",
+  description: "Synology NAS: CPU, memory, throughput, temperature and actions.",
 });
 console.info("%c SYNOLOGY-NAS-CARD %c v" + SYNAS_VERSION + " ",
   "color:#fff;background:#378ADD;font-weight:700", "color:#378ADD;background:#222");
 
 /* ============================================================
-EXEMPLE DE CONFIG
+CONFIG EXAMPLES
 
+# Minimal: everything auto-detected from the first Synology NAS
 type: custom:synology-nas-card
-title: Guy
+
+# Explicit (any key set here wins over detection)
+type: custom:synology-nas-card
+title: NAS
 icon: mdi:nas
 accent: "#378ADD"
-subtitle: DiskStation
-security_entity: binary_sensor.syno_security_status
-last_boot: sensor.syno_last_boot
-update_entity: update.syno_dsm_update
-temperature: sensor.syno_temperature
-temp_warn: 50
-temp_critical: 60
-warn_at: 75
-critical_at: 90
+security_entity: binary_sensor.example_nas_security_status
+last_boot: sensor.example_nas_last_boot
+update_entity: update.example_nas_dsm_update
+temperature: sensor.example_nas_temperature
 gauges:
   - name: CPU
-    percentage: sensor.syno_cpu_utilization_total
+    percentage: sensor.example_nas_cpu_utilization_total
     color: "#378ADD"
-  - name: Mémoire
-    percentage: sensor.syno_memory_usage_real
-    free: sensor.syno_memory_available_real
-    total: sensor.syno_memory_total_real
+  - name: Memory
+    percentage: sensor.example_nas_memory_usage_real
+    free: sensor.example_nas_memory_available_real
+    total: sensor.example_nas_memory_total_real
     color: "#7F77DD"
-  - name: Charge 5 min
-    value: sensor.syno_cpu_load_average_5_min
+  - name: Load 5 min
+    value: sensor.example_nas_cpu_load_average_5_min
     max: 4
     color: "#1D9E75"
 throughput:
-  download: sensor.syno_download_throughput
-  upload: sensor.syno_upload_throughput
-actions_label: Contrôles du NAS
+  download: sensor.example_nas_download_throughput
+  upload: sensor.example_nas_upload_throughput
 actions:
-  - name: Redémarrer
-    entity: button.syno_reboot
+  - name: Reboot
+    entity: button.example_nas_reboot
     icon: mdi:restart
-    color: "#378ADD"
-  - name: Arrêter
-    entity: button.syno_shutdown
+  - name: Shut down
+    entity: button.example_nas_shutdown
     icon: mdi:power
     color: "#E24B4A"
 ============================================================ */

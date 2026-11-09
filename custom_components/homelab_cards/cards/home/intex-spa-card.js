@@ -1,22 +1,21 @@
 /**
  * Intex Spa Card — vanilla JS custom Lovelace card
- * Kenny3231 / HA 2026.8+
- * Deploy: /config/www/perso/intex-spa-card.js
- * Resource: /local/perso/intex-spa-card.js?v2  (type: module)
+ * Integration: mathieu-mp/homeassistant-intex-spa (platform "intex_spa")
  *
- * Aucune dépendance. Éditeur visuel inclus.
- * Intégration: mathieu-mp/homeassistant-intex-spa
+ * No dependency. Visual editor included.
  *
- * v2 :
- *  - Bouton chauffage (climate.set_hvac_mode heat/off)
- *  - Animations cumulables : bulles qui montent (bubbles ON) + vapeur (chauffe active)
- *  - Jets / Sanitizer masquables : entité vide "" ou absente => bouton retiré, grille auto
+ *  - Heating button (climate.set_hvac_mode heat/off)
+ *  - Stackable animations: rising bubbles (bubbles ON) + steam (heating active)
+ *  - Optional buttons: empty entity "" => button removed, grid adapts
+ *  - Entities left unset are auto-detected (platform + translation_key /
+ *    integration icon, never display names) when a spa device is chosen or
+ *    when nothing is configured.
  */
 
-const CARD_VERSION = "2.0.0";
+const CARD_VERSION = "2.1.0";
 
-/* Réglages non-entité uniquement. Les entités ne sont PAS en dur ici :
-   un champ vidé dans l'éditeur reste vide (donc masqué s'il est optionnel). */
+/* Non-entity settings only. Entities are NOT hard-coded here:
+   a field emptied in the editor stays empty (hence hidden if optional). */
 const DEFAULTS = {
   name: "Spa",
   hvac_heat: "heat",
@@ -27,27 +26,101 @@ const DEFAULTS = {
   hold_power: true,
 };
 
-/* Config proposée à l'ajout de la carte (une seule fois). */
-const STUB = {
-  name: "Spa Terrasse",
-  climate: "climate.spa",
-  current_temp: "sensor.spa_current_temperature",
-  target_temp: "sensor.spa_target_temperature",
-  filter: "switch.spa_filter",
-  bubbles: "switch.spa_bubbles",
-  jets: "switch.spa_jets",
-  sanitizer: "switch.spa_sanitizer",
-  power: "switch.spa_power",
-  error: "sensor.spa_error",
-  error_description: "sensor.spa_error_description",
+const IS_ENTITY_KEYS = ["climate", "current_temp", "target_temp", "filter", "bubbles",
+  "jets", "sanitizer", "power", "error", "error_description"];
+
+/* Icons set by the integration itself on its switches (language independent). */
+const IS_SWITCH_ICONS = {
+  power: "mdi:power-plug-outline", filter: "mdi:air-filter", jets: "mdi:weather-windy",
+  bubbles: "mdi:chart-bubble", sanitizer: "mdi:recycle-variant",
 };
 
 const SWITCH_BUTTONS = [
-  { key: "filter", label: "Filtre", icon: "mdi:filter", color: "29,158,117" },
-  { key: "bubbles", label: "Bulles", icon: "mdi:chart-bubble", color: "53,138,221" },
-  { key: "jets", label: "Jets", icon: "mdi:weather-windy", color: "133,183,235" },
-  { key: "sanitizer", label: "Sanitizer", icon: "mdi:recycle", color: "159,225,203" },
+  { key: "filter", icon: "mdi:filter", color: "29,158,117" },
+  { key: "bubbles", icon: "mdi:chart-bubble", color: "53,138,221" },
+  { key: "jets", icon: "mdi:weather-windy", color: "133,183,235" },
+  { key: "sanitizer", icon: "mdi:recycle", color: "159,225,203" },
 ];
+
+/* ---------- i18n ---------- */
+const IS_I18N = {
+  fr: {
+    target: "Cible", setpoint: "Consigne", heating: "Chauffage", heating_to: "Chauffe vers {t}",
+    offline: "Hors ligne", st_heat: "Chauffe", st_filter: "Filtration", st_bubbles: "Bulles",
+    standby: "En veille", off: "Éteint", error: "Erreur {c}", power: "Power",
+    pw_off_hold: "Éteindre (hold)", pw_on_hold: "Allumer (hold)", pw_off: "Éteindre", pw_on: "Allumer",
+    sw_filter: "Filtre", sw_bubbles: "Bulles", sw_jets: "Jets", sw_sanitizer: "Sanitizer",
+    sec_gen: "Général", sec_ctrl: "Commandes", sec_err: "Erreurs", sec_adv: "Avancé (modes climate)",
+    expand_all: "Tout déplier", collapse_all: "Tout replier",
+    hint_auto: "Choisis un spa : les entités non renseignées sont détectées automatiquement.",
+    l_device_id: "Spa (détection auto)",
+    l_name: "Nom affiché", l_climate: "Climate (consigne + chauffage)",
+    l_current_temp: "Température actuelle", l_target_temp: "Température cible (fallback)",
+    l_filter: "Filtre (vide = masqué)", l_bubbles: "Bulles (vide = masqué)",
+    l_jets: "Jets (vide = masqué)", l_sanitizer: "Sanitizer (vide = masqué)",
+    l_power: "Power (vide = masqué)",
+    l_error: "Capteur erreur", l_error_description: "Description erreur",
+    l_hvac_heat: "Mode chauffe", l_hvac_off: "Mode arrêt",
+    l_hold_power: "Confirmation hold sur Power",
+  },
+  en: {
+    target: "Target", setpoint: "Setpoint", heating: "Heating", heating_to: "Heating to {t}",
+    offline: "Offline", st_heat: "Heating", st_filter: "Filtration", st_bubbles: "Bubbles",
+    standby: "Standby", off: "Off", error: "Error {c}", power: "Power",
+    pw_off_hold: "Turn off (hold)", pw_on_hold: "Turn on (hold)", pw_off: "Turn off", pw_on: "Turn on",
+    sw_filter: "Filter", sw_bubbles: "Bubbles", sw_jets: "Jets", sw_sanitizer: "Sanitizer",
+    sec_gen: "General", sec_ctrl: "Controls", sec_err: "Errors", sec_adv: "Advanced (climate modes)",
+    expand_all: "Expand all", collapse_all: "Collapse all",
+    hint_auto: "Pick a spa: entities left empty are detected automatically.",
+    l_device_id: "Spa (auto-detection)",
+    l_name: "Display name", l_climate: "Climate (setpoint + heating)",
+    l_current_temp: "Current temperature", l_target_temp: "Target temperature (fallback)",
+    l_filter: "Filter (empty = hidden)", l_bubbles: "Bubbles (empty = hidden)",
+    l_jets: "Jets (empty = hidden)", l_sanitizer: "Sanitizer (empty = hidden)",
+    l_power: "Power (empty = hidden)",
+    l_error: "Error sensor", l_error_description: "Error description",
+    l_hvac_heat: "Heat mode", l_hvac_off: "Off mode",
+    l_hold_power: "Hold to confirm Power",
+  },
+};
+const isLang = (h) => {
+  const l = (h && ((h.locale && h.locale.language) || h.language)) || "en";
+  return String(l).toLowerCase().indexOf("fr") === 0 ? "fr" : "en";
+};
+function isT(lang, k, vars) {
+  let s = IS_I18N[lang][k];
+  if (s === undefined) s = IS_I18N.en[k] !== undefined ? IS_I18N.en[k] : k;
+  return vars ? s.replace(/\{(\w+)\}/g, (_, v) => vars[v]) : s;
+}
+const isEsc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ---------- intex_spa auto-detection ---------- */
+function isDetect(hass, deviceId) {
+  const out = {};
+  if (!hass) return out;
+  const ents = Object.values(hass.entities || {}).filter((e) => e.platform === "intex_spa" && e.device_id);
+  const first = ents.find((e) => e.entity_id.indexOf("climate.") === 0) || ents[0];
+  const dev = deviceId || (first && first.device_id);
+  if (!dev) return out;
+  ents.filter((e) => e.device_id === dev).forEach((e) => {
+    const id = e.entity_id, domain = id.split(".")[0];
+    const st = hass.states[id];
+    const icon = st && st.attributes ? st.attributes.icon : undefined;
+    if (domain === "climate") out.climate = out.climate || id;
+    else if (domain === "sensor" && (e.translation_key === "error" || e.translation_key === "error_description")) {
+      out[e.translation_key] = id;
+    } else if (domain === "switch") {
+      Object.keys(IS_SWITCH_ICONS).forEach((k) => {
+        if (!out[k] && (icon === IS_SWITCH_ICONS[k] || id.slice(-(k.length + 1)) === "_" + k)) out[k] = id;
+      });
+    }
+  });
+  /* current/target temperature come from the climate entity (sensors are disabled by default). */
+  const d = (hass.devices || {})[dev];
+  if (d) out._name = d.name_by_user || d.name;
+  return out;
+}
 
 class IntexSpaCard extends HTMLElement {
   constructor() {
@@ -58,28 +131,54 @@ class IntexSpaCard extends HTMLElement {
   }
 
   setConfig(config) {
+    this._user = config;
     this._config = { ...DEFAULTS, ...config };
+    /* Explicit keys always win; detection only fills unset keys. */
+    this._autoMode = !!config.device_id || !IS_ENTITY_KEYS.some((k) => config[k] !== undefined);
+    this._entRef = undefined;
     this._built = false;
   }
 
   set hass(hass) {
     this._hass = hass;
+    this._lang = isLang(hass);
+    if (this._autoMode && hass.entities !== this._entRef) {
+      this._entRef = hass.entities;
+      const u = this._user, d = isDetect(hass, u.device_id), c = { ...DEFAULTS, ...u };
+      IS_ENTITY_KEYS.forEach((k) => { if (u[k] === undefined && d[k]) c[k] = d[k]; });
+      if (u.name === undefined && d._name) c.name = d._name;
+      this._config = c;
+      this._built = false;
+    }
     if (!this._built) { this._build(); this._built = true; }
     this._refresh();
   }
 
   getCardSize() { return 5; }
   static getConfigElement() { return document.createElement("intex-spa-card-editor"); }
-  static getStubConfig() { return { ...DEFAULTS, ...STUB }; }
+  /* Stub filled with the entities of the first detected spa (explicit ids), else bare. */
+  static getStubConfig(hass) {
+    const d = isDetect(hass), stub = { ...DEFAULTS };
+    IS_ENTITY_KEYS.forEach((k) => { if (d[k]) stub[k] = d[k]; });
+    if (d._name) stub.name = d._name;
+    return stub;
+  }
 
+  _t(k, vars) { return isT(this._lang || "en", k, vars); }
   _st(id) { if (!id || !this._hass) return undefined; return this._hass.states[id]; }
   _isOn(id) { const s = this._st(id); return s && s.state === "on"; }
   _isAvail(id) { const s = this._st(id); return s && !["unavailable","unknown",""].includes(s.state) && s.state !== undefined; }
   _num(id) { const s = this._st(id); if (!s) return null; const v = parseFloat(s.state); return Number.isFinite(v) ? v : null; }
-  /** Une entité est "active" (affichée) si le champ est renseigné et non-vide. */
+  /** An entity is "active" (shown) if the field is set and non-empty. */
   _enabled(key) {
     const id = this._config[key];
     return typeof id === "string" && id.trim() !== "";
+  }
+  /* Temperature unit: sensor unit, else HA unit system. */
+  _unit() {
+    const s = this._st(this._config.current_temp);
+    const us = this._hass && this._hass.config && this._hass.config.unit_system;
+    return (s && s.attributes && s.attributes.unit_of_measurement) || (us && us.temperature) || "°C";
   }
 
   _toggle(id) { if (!this._isAvail(id)) return; const d = id.split(".")[0]; this._hass.callService(d, "toggle", { entity_id: id }); }
@@ -94,7 +193,7 @@ class IntexSpaCard extends HTMLElement {
     this._hass.callService("climate", "set_temperature", { entity_id: c, temperature: next });
   }
 
-  /* Bornes/pas : depuis climate.spa si dispo (rien en dur), sinon fallback config. */
+  /* Bounds/step: from the climate entity when available, else config fallback. */
   _tmin() {
     const cs = this._st(this._config.climate);
     const v = cs && parseFloat(cs.attributes.min_temp);
@@ -151,6 +250,7 @@ class IntexSpaCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot;
     const cfg = this._config;
+    const unit = isEsc(this._unit());
 
     const bubbleCount = 22;
     let bubblesHtml = "";
@@ -189,16 +289,16 @@ class IntexSpaCard extends HTMLElement {
           </div>
           <div class="err" id="err"></div>
           <div class="center">
-            <div class="temp"><span id="cur">--</span><span class="unit">°C</span></div>
-            <div class="target" id="target-line"><ha-icon icon="mdi:target"></ha-icon> Cible <span id="tgt">--</span>°C</div>
+            <div class="temp"><span id="cur">--</span><span class="unit">${unit}</span></div>
+            <div class="target" id="target-line"><ha-icon icon="mdi:target"></ha-icon> ${isEsc(this._t("target"))} <span id="tgt">--</span>${unit}</div>
           </div>
         </div>
 
         <div class="setrow">
           <button class="stepbtn" id="minus"><ha-icon icon="mdi:minus"></ha-icon></button>
           <div class="setbox">
-            <div class="setlbl">Consigne</div>
-            <div class="setval" id="setval">--°C</div>
+            <div class="setlbl">${isEsc(this._t("setpoint"))}</div>
+            <div class="setval" id="setval">--${unit}</div>
           </div>
           <button class="stepbtn" id="plus"><ha-icon icon="mdi:plus"></ha-icon></button>
         </div>
@@ -218,17 +318,17 @@ class IntexSpaCard extends HTMLElement {
       const heat = document.createElement("button");
       heat.className = "ctrl heat"; heat.id = "btn-heat";
       heat.style.setProperty("--c", "186,117,23");
-      heat.innerHTML = `<ha-icon icon="mdi:fire"></ha-icon><div class="clbl">Chauffage</div>`;
+      heat.innerHTML = `<ha-icon icon="mdi:fire"></ha-icon><div class="clbl">${isEsc(this._t("heating"))}</div>`;
       heat.addEventListener("click", () => this._toggleHeat());
       grid.appendChild(heat);
     }
 
     SWITCH_BUTTONS.forEach((b) => {
-      if (!this._enabled(b.key)) return; // entité vide => pas d'icône
+      if (!this._enabled(b.key)) return; // empty entity => no button
       const el = document.createElement("button");
       el.className = "ctrl"; el.id = `sw-${b.key}`;
       el.style.setProperty("--c", b.color);
-      el.innerHTML = `<ha-icon icon="${b.icon}"></ha-icon><div class="clbl">${b.label}</div>`;
+      el.innerHTML = `<ha-icon icon="${b.icon}"></ha-icon><div class="clbl">${isEsc(this._t("sw_" + b.key))}</div>`;
       el.addEventListener("click", () => this._toggle(cfg[b.key]));
       grid.appendChild(el);
     });
@@ -237,7 +337,7 @@ class IntexSpaCard extends HTMLElement {
     if (this._enabled("power")) {
       const pbtn = document.createElement("button");
       pbtn.className = "ctrl power"; pbtn.id = "power-btn";
-      pbtn.innerHTML = `<ha-icon icon="mdi:power"></ha-icon><div class="clbl" id="power-lbl">Power</div><div class="holdbar"></div>`;
+      pbtn.innerHTML = `<ha-icon icon="mdi:power"></ha-icon><div class="clbl" id="power-lbl">${isEsc(this._t("power"))}</div><div class="holdbar"></div>`;
       const dn = (e) => { e.preventDefault(); this._powerPress(true); };
       const up = () => this._powerPress(false);
       pbtn.addEventListener("pointerdown", dn);
@@ -253,21 +353,26 @@ class IntexSpaCard extends HTMLElement {
 
   _refresh() {
     const root = this.shadowRoot;
-    // Garde solide : on ne rafraîchit que si le DOM cœur est entièrement présent.
+    // Solid guard: only refresh when the core DOM is fully present.
     const curEl = root.getElementById("cur");
     const tgtEl = root.getElementById("tgt");
     const setvalEl = root.getElementById("setval");
     const tlEl = root.getElementById("target-line");
     const wavesEl = root.getElementById("waves");
     if (!curEl || !tgtEl || !setvalEl || !tlEl || !wavesEl) {
-      // DOM pas prêt (rendu réentrant / cache) : forcer une reconstruction au prochain hass.
+      // DOM not ready (re-entrant render / cache): force a rebuild on next hass.
       this._built = false;
       return;
     }
     const cfg = this._config;
+    const unit = this._unit();
 
-    const cur = this._num(cfg.current_temp);
     const cs = this._st(cfg.climate);
+    let cur = this._num(cfg.current_temp);
+    if (cur === null && cs) {
+      const v = parseFloat(cs.attributes.current_temperature);
+      if (Number.isFinite(v)) cur = v;
+    }
     const tgt = cs && Number.isFinite(parseFloat(cs.attributes.temperature))
       ? parseFloat(cs.attributes.temperature) : this._num(cfg.target_temp);
 
@@ -277,14 +382,14 @@ class IntexSpaCard extends HTMLElement {
 
     curEl.textContent = cur !== null ? Math.round(cur) : "--";
     tgtEl.textContent = tgt !== null ? Math.round(tgt) : "--";
-    setvalEl.textContent = tgt !== null ? `${Math.round(tgt)}°C` : "--°C";
+    setvalEl.textContent = tgt !== null ? `${Math.round(tgt)}${unit}` : `--${unit}`;
 
     const tl = tlEl;
     if (heating && tgt !== null) {
-      tl.innerHTML = `<ha-icon icon="mdi:fire"></ha-icon> Chauffe vers ${Math.round(tgt)}°C`;
+      tl.innerHTML = `<ha-icon icon="mdi:fire"></ha-icon> ${isEsc(this._t("heating_to", { t: Math.round(tgt) + unit }))}`;
       tl.classList.add("heating");
     } else {
-      tl.innerHTML = `<ha-icon icon="mdi:target"></ha-icon> Cible <span>${tgt !== null ? Math.round(tgt) : "--"}</span>°C`;
+      tl.innerHTML = `<ha-icon icon="mdi:target"></ha-icon> ${isEsc(this._t("target"))} <span>${tgt !== null ? Math.round(tgt) : "--"}</span>${isEsc(unit)}`;
       tl.classList.remove("heating");
     }
 
@@ -305,19 +410,19 @@ class IntexSpaCard extends HTMLElement {
 
     const chip = root.getElementById("status-chip");
     if (!online) {
-      chip.textContent = "● Hors ligne"; chip.className = "chip off";
+      chip.textContent = "● " + this._t("offline"); chip.className = "chip off";
     } else {
       const parts = [];
-      if (heating) parts.push("Chauffe");
-      if (this._isOn(cfg.filter)) parts.push("Filtration");
-      if (bubbling) parts.push("Bulles");
+      if (heating) parts.push(this._t("st_heat"));
+      if (this._isOn(cfg.filter)) parts.push(this._t("st_filter"));
+      if (bubbling) parts.push(this._t("st_bubbles"));
       if (parts.length) {
         chip.textContent = "● " + parts.join(" · ");
         chip.className = heating ? "chip heat" : "chip on";
       } else if (this._isOn(cfg.power)) {
-        chip.textContent = "● En veille"; chip.className = "chip idle";
+        chip.textContent = "● " + this._t("standby"); chip.className = "chip idle";
       } else {
-        chip.textContent = "○ Éteint"; chip.className = "chip off";
+        chip.textContent = "○ " + this._t("off"); chip.className = "chip off";
       }
     }
 
@@ -326,7 +431,8 @@ class IntexSpaCard extends HTMLElement {
     const errDesc = this._st(cfg.error_description);
     const hasErr = errS && !["0","off","none","ok","unavailable","unknown",""].includes(String(errS.state).toLowerCase());
     if (hasErr) {
-      errEl.textContent = errDesc && errDesc.state && errDesc.state !== "unavailable" ? errDesc.state : `Erreur ${errS.state}`;
+      errEl.textContent = errDesc && errDesc.state && errDesc.state !== "unavailable"
+        ? errDesc.state : this._t("error", { c: errS.state });
       errEl.classList.add("show");
     } else {
       errEl.classList.remove("show");
@@ -353,8 +459,8 @@ class IntexSpaCard extends HTMLElement {
       pbtn.classList.toggle("active", pOn);
       pbtn.classList.toggle("disabled", !this._isAvail(cfg.power) && !pOn);
       const plbl = root.getElementById("power-lbl");
-      if (plbl) plbl.textContent =
-        cfg.hold_power ? (pOn ? "Éteindre (hold)" : "Allumer (hold)") : (pOn ? "Éteindre" : "Allumer");
+      if (plbl) plbl.textContent = this._t(cfg.hold_power
+        ? (pOn ? "pw_off_hold" : "pw_on_hold") : (pOn ? "pw_off" : "pw_on"));
     }
 
     const canSet = this._isAvail(cfg.climate);
@@ -444,63 +550,117 @@ class IntexSpaCard extends HTMLElement {
   }
 }
 
+/* ================= EDITOR ================= */
+
+/* ---------- Collapsible sections (open state survives editor re-creation) ---------- */
+const IS_SEC_STATE = new Map(); /* `${tagName}:${sectionId}` -> open */
+const IS_SEC_CSS = `
+  .sec { margin-bottom:18px; }
+  .sec-tools { display:flex; justify-content:flex-end; gap:4px; margin-bottom:6px; }
+  .sec-tools button { background:none; border:none; cursor:pointer; padding:2px 6px;
+    border-radius:4px; font:inherit; font-size:12px; color:var(--secondary-text-color); }
+  .sec-tools button:hover { color:var(--primary-text-color); }
+  .sec-head { width:100%; display:flex; align-items:center; gap:8px; margin:0 0 10px 0;
+    padding:0 0 6px 0; background:none; border:none; border-bottom:1px solid var(--divider-color);
+    cursor:pointer; font:inherit; text-align:left; color:var(--primary-text-color); }
+  .sec-head[aria-expanded="false"] { margin-bottom:0; }
+  .sec-head:focus-visible, .sec-tools button:focus-visible {
+    outline:2px solid var(--primary-color); outline-offset:2px; border-radius:4px; }
+  .sec-head .chev { --mdc-icon-size:20px; color:var(--secondary-text-color); transition:transform .2s ease; }
+  .sec-head[aria-expanded="false"] .chev { transform:rotate(-90deg); }
+  .sec-title { font-size:15px; font-weight:600; flex:1; }
+  .sec-hint { font-size:12px; color:var(--secondary-text-color); margin:-4px 0 10px 0; line-height:1.4; }
+  .sec-body[hidden] { display:none; }
+  ha-form { display:block; }
+`;
+const isSec = (id, title, body) =>
+  '<div class="sec" data-sec="' + id + '"><button type="button" class="sec-head" aria-controls="sec-' + id + '">' +
+  '<ha-icon class="chev" icon="mdi:chevron-down"></ha-icon><span class="sec-title">' + isEsc(title) + "</span></button>" +
+  '<div class="sec-body" id="sec-' + id + '">' + body + "</div></div>";
+/* First section open by default, the others collapsed. Only toggles `hidden`:
+   fields are never re-created, so focus and typed values are kept. */
+function isSecWire(root, tag) {
+  const secs = root.querySelectorAll(".sec");
+  const set = (sec, open) => {
+    IS_SEC_STATE.set(tag + ":" + sec.dataset.sec, open);
+    sec.querySelector(".sec-head").setAttribute("aria-expanded", String(open));
+    sec.querySelector(".sec-body").hidden = !open;
+  };
+  secs.forEach((sec, i) => {
+    const k = tag + ":" + sec.dataset.sec;
+    set(sec, IS_SEC_STATE.has(k) ? IS_SEC_STATE.get(k) : i === 0);
+    const head = sec.querySelector(".sec-head");
+    head.addEventListener("click", () => set(sec, head.getAttribute("aria-expanded") !== "true"));
+  });
+  root.querySelectorAll(".sec-all").forEach((b) =>
+    b.addEventListener("click", () => secs.forEach((s) => set(s, b.dataset.open === "1"))));
+}
+
+const IS_SCHEMAS = {
+  gen: [
+    { name: "name", selector: { text: {} } },
+    { name: "device_id", selector: { device: { filter: { integration: "intex_spa" } } } },
+    { name: "climate", selector: { entity: { domain: "climate" } } },
+    { name: "current_temp", selector: { entity: { domain: "sensor" } } },
+    { name: "target_temp", selector: { entity: { domain: "sensor" } } },
+  ],
+  ctrl: [
+    { name: "filter", selector: { entity: { domain: "switch" } } },
+    { name: "bubbles", selector: { entity: { domain: "switch" } } },
+    { name: "jets", selector: { entity: { domain: "switch" } } },
+    { name: "sanitizer", selector: { entity: { domain: "switch" } } },
+    { name: "power", selector: { entity: { domain: "switch" } } },
+    { name: "hold_power", selector: { boolean: {} } },
+  ],
+  err: [
+    { name: "error", selector: { entity: { domain: "sensor" } } },
+    { name: "error_description", selector: { entity: { domain: "sensor" } } },
+  ],
+  adv: [
+    { type: "grid", schema: [
+      { name: "hvac_heat", selector: { text: {} } },
+      { name: "hvac_off", selector: { text: {} } },
+    ]},
+  ],
+};
+
 class IntexSpaCardEditor extends HTMLElement {
   setConfig(config) { this._config = { ...DEFAULTS, ...config }; this._render(); }
-  set hass(hass) { this._hass = hass; if (this._form) this._form.hass = hass; }
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._forms) this._render();
+    else this._forms.forEach((f) => { f.hass = hass; });
+  }
+  /* Built once hass is known, so the UI language is available. */
   _render() {
+    if (!this._config || !this._hass) return;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
-    if (!this._form) {
-      this._form = document.createElement("ha-form");
-      this._form.addEventListener("value-changed", (e) => {
-        this._config = e.detail.value;
-        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config } }));
+    if (!this._forms) {
+      const L = isLang(this._hass), t = (k) => isEsc(isT(L, k));
+      this.shadowRoot.innerHTML = `<style>${IS_SEC_CSS}</style>
+        <div class="sec-tools"><button type="button" class="sec-all" data-open="1">${t("expand_all")}</button><button type="button" class="sec-all" data-open="0">${t("collapse_all")}</button></div>
+        ${isSec("gen", isT(L, "sec_gen"), `<div class="sec-hint">${t("hint_auto")}</div><ha-form data-schema="gen"></ha-form>`)}
+        ${isSec("ctrl", isT(L, "sec_ctrl"), `<ha-form data-schema="ctrl"></ha-form>`)}
+        ${isSec("err", isT(L, "sec_err"), `<ha-form data-schema="err"></ha-form>`)}
+        ${isSec("adv", isT(L, "sec_adv"), `<ha-form data-schema="adv"></ha-form>`)}`;
+      isSecWire(this.shadowRoot, this.tagName.toLowerCase());
+      this._forms = Array.from(this.shadowRoot.querySelectorAll("ha-form"));
+      this._forms.forEach((f) => {
+        f.schema = IS_SCHEMAS[f.dataset.schema];
+        f.computeLabel = (s) => isT(L, "l_" + s.name);
+        f.addEventListener("value-changed", (e) => {
+          const prev = this._config, next = { ...e.detail.value };
+          /* A cleared entity stays "" (= hidden) instead of falling back to auto-detection. */
+          IS_ENTITY_KEYS.forEach((k) => { if (prev[k] !== undefined && next[k] === undefined) next[k] = ""; });
+          if (!next.device_id) delete next.device_id;
+          this._config = next;
+          this._render();
+          this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config } }));
+        });
       });
-      this.shadowRoot.appendChild(this._form);
     }
-    this._form.hass = this._hass;
-    this._form.data = this._config;
-    this._form.schema = this._schema();
-    this._form.computeLabel = (s) => this._label(s.name);
-  }
-  _schema() {
-    return [
-      { name: "name", selector: { text: {} } },
-      { name: "climate", selector: { entity: { domain: "climate" } } },
-      { name: "current_temp", selector: { entity: { domain: "sensor" } } },
-      { name: "target_temp", selector: { entity: { domain: "sensor" } } },
-      { name: "filter", selector: { entity: { domain: "switch" } } },
-      { name: "bubbles", selector: { entity: { domain: "switch" } } },
-      { name: "jets", selector: { entity: { domain: "switch" } } },
-      { name: "sanitizer", selector: { entity: { domain: "switch" } } },
-      { name: "power", selector: { entity: { domain: "switch" } } },
-      { name: "error", selector: { entity: { domain: "sensor" } } },
-      { name: "error_description", selector: { entity: { domain: "sensor" } } },
-      { name: "hold_power", selector: { boolean: {} } },
-      {
-        name: "advanced",
-        type: "expandable",
-        title: "Avancé (modes climate)",
-        schema: [
-          { name: "hvac", type: "grid", schema: [
-            { name: "hvac_heat", selector: { text: {} } },
-            { name: "hvac_off", selector: { text: {} } },
-          ]},
-        ],
-      },
-    ];
-  }
-  _label(name) {
-    const map = {
-      name: "Nom affiché", climate: "Climate (consigne + chauffage)",
-      current_temp: "Température actuelle", target_temp: "Température cible (fallback)",
-      filter: "Filtre (vide = masqué)", bubbles: "Bulles (vide = masqué)",
-      jets: "Jets (vide = masqué)", sanitizer: "Sanitizer (vide = masqué)",
-      power: "Power (vide = masqué)",
-      error: "Capteur erreur", error_description: "Description erreur",
-      hvac_heat: "Mode chauffe", hvac_off: "Mode arrêt",
-      hold_power: "Confirmation hold sur Power",
-    };
-    return map[name] || name;
+    /* Every form gets the full, current config so no form emits stale values. */
+    this._forms.forEach((f) => { f.hass = this._hass; f.data = this._config; });
   }
 }
 
@@ -511,7 +671,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "intex-spa-card",
   name: "Intex Spa Card",
-  description: "Card animée pour spa Intex : vague, bulles, vapeur de chauffe, hold power.",
+  description: "Animated Intex spa card: waves, bubbles, heating steam, hold-to-power.",
   preview: true,
   documentationURL: "https://github.com/mathieu-mp/homeassistant-intex-spa",
 });

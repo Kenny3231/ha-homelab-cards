@@ -34,6 +34,12 @@
             "data": {
               "cards": "Cartes"
             }
+          },
+          "containers": {
+            "name": "Conteneurs",
+            "data": {
+              "cards": "Cartes"
+            }
           }
         }
       }
@@ -74,6 +80,12 @@
           },
           "home": {
             "name": "Maison",
+            "data": {
+              "cards": "Cartes"
+            }
+          },
+          "containers": {
+            "name": "Conteneurs",
             "data": {
               "cards": "Cartes"
             }

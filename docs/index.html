@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Homelab Cards for Home Assistant</title>
-<meta name="description" content="Cartes Lovelace pour homelab : UniFi, Proxmox, Synology, Transmission, DNS Technitium, Android TV. Éditeur visuel intégré, installation HACS en un clic.">
+<meta name="description" content="Cartes Lovelace pour homelab : UniFi, Proxmox, Synology, Transmission, DNS Technitium, Android TV. Une seule intégration HACS, vous choisissez les cartes : éditeur visuel intégré, aucune ressource à déclarer.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#0288d1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2303a9f4'/%3E%3Cpath d='M8 15 16 8l8 7v9H8z' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -63,9 +63,14 @@
       <aside class="aside-card">
         <h3 data-i18n="quick_h"></h3>
         <p data-i18n="quick_p"></p>
-        <a class="btn primary block" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=Kenny3231&amp;repository=ha-homelab-cards&amp;category=plugin"><svg class="ic"><use href="#i-ext"/></svg><span data-i18n="quick_btn"></span></a>
+        <a class="btn primary block" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=Kenny3231&amp;repository=ha-homelab-cards&amp;category=integration"><svg class="ic"><use href="#i-ext"/></svg><span data-i18n="quick_btn"></span></a>
         <p class="small" data-i18n="no_yaml"></p>
       </aside>
+    </div>
+    <div class="pick" id="pick">
+      <div class="pick-copy"><h3 data-i18n="pick_h"></h3><p data-i18n="pick_p"></p><ul class="perks" id="pick-perks"></ul></div>
+      <figure class="window pick-win" aria-hidden="true"><div class="chrome"><i></i><i></i><i></i><span>Homelab Cards</span></div>
+        <div class="pick-body"><p data-i18n="pick_win"></p><ul id="pick-list"></ul><span class="pick-btn" data-i18n="pick_submit"></span></div></figure>
     </div>
   </div></section>
 
@@ -107,6 +112,6 @@
   <button type="button" class="icon-btn lb-close" id="lb-close"><svg class="ic"><use href="#i-close"/></svg></button>
   <figure><img id="lb-img" alt=""><figcaption id="lb-cap"></figcaption></figure>
 </dialog>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

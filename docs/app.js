@@ -4,23 +4,30 @@ const I18N = {
     skip: "Aller au contenu",
     nav_install: "Installation", nav_cards: "Cartes", nav_editor: "Éditeur", nav_req: "Intégrations",
     h1: "Votre homelab, <em>en un coup d'œil</em> dans Home Assistant",
-    lead: "Des cartes Lovelace soignées pour UniFi, Proxmox, Synology, Transmission, DNS Technitium et Android TV. Zéro dépendance, éditeur visuel intégré, installation en un clic via HACS.",
+    lead: "Des cartes Lovelace soignées pour UniFi, Proxmox, Synology, Transmission, DNS Technitium et Android TV. Une seule installation via HACS, vous choisissez les cartes. Zéro dépendance, éditeur visuel intégré.",
     cta_gh: "Voir sur GitHub", cta_install: "Installer",
     facts: (n, c) => [`<b>${n}</b> cartes`, `<b>${c}</b> catégories`, "Éditeur visuel", "Zéro dépendance"],
     h_install: "Installation avec HACS",
-    install_lead: "Cinq étapes, deux minutes. HACS se charge du téléchargement et des mises à jour.",
+    install_lead: "Une seule intégration, cinq étapes, deux minutes. HACS se charge du téléchargement et des mises à jour.",
     steps: [
       "Dans HACS, ouvrez le menu <b>⋮</b> puis <b>Dépôts personnalisés</b>.",
-      "Collez l'adresse du dépôt et choisissez le type <b>Tableau de bord</b>.",
-      "Cherchez <b>Homelab Cards</b> et cliquez sur <b>Télécharger</b>.",
-      "Rechargez le navigateur (<code>Ctrl+Shift+R</code>) pour charger les cartes.",
-      "Modifiez un tableau de bord → <b>Ajouter une carte</b> → choisissez une carte Homelab.",
+      "Ajoutez l'adresse du dépôt avec le type <b>Intégration</b>.",
+      "Cherchez <b>Homelab Cards</b>, cliquez sur <b>Télécharger</b> puis redémarrez Home Assistant.",
+      "<b>Paramètres</b> → <b>Appareils et services</b> → <b>Ajouter une intégration</b> → <b>Homelab Cards</b>, puis cochez les cartes voulues.",
+      "Rechargez le navigateur (<code>Ctrl+Shift+R</code>), puis <b>Ajouter une carte</b> sur un tableau de bord.",
     ],
     copy: "Copier", copied: "Copié",
     quick_h: "Raccourci My Home Assistant",
     quick_p: "Ouvre directement le dépôt dans le HACS de votre instance, sans copier-coller.",
     quick_btn: "Ouvrir dans HACS",
-    no_yaml: "HACS déclare la ressource automatiquement : rien à écrire dans configuration.yaml.",
+    no_yaml: "L'intégration charge elle-même les cartes cochées : aucune ressource à déclarer, même avec un tableau de bord en mode YAML.",
+    pick_h: "Choisissez vos cartes",
+    pick_p: "À l'ajout de l'intégration, un écran liste toutes les cartes : cochez celles dont vous avez besoin, seules celles-ci sont chargées.",
+    pick_perks: [
+      ["Chargement automatique", "Chaque carte cochée est servie comme un fichier séparé et chargée par Home Assistant."],
+      ["Modifiable à tout moment", "Paramètres → Appareils et services → Homelab Cards → Configurer, puis rechargez le navigateur."],
+    ],
+    pick_win: "Cartes à charger", pick_submit: "Valider",
     h_cards: "Les cartes",
     cards_lead: "Chaque carte lit les entités d'une intégration Home Assistant. Filtrez par catégorie, cliquez sur une capture pour l'agrandir.",
     all: "Toutes", shown: (n) => `${n} carte${n > 1 ? "s" : ""} affichée${n > 1 ? "s" : ""}`,
@@ -50,23 +57,30 @@ const I18N = {
     skip: "Skip to content",
     nav_install: "Install", nav_cards: "Cards", nav_editor: "Editor", nav_req: "Integrations",
     h1: "Your homelab, <em>at a glance</em> in Home Assistant",
-    lead: "Polished Lovelace cards for UniFi, Proxmox, Synology, Transmission, Technitium DNS and Android TV. Zero dependency, built-in visual editor, one-click install through HACS.",
+    lead: "Polished Lovelace cards for UniFi, Proxmox, Synology, Transmission, Technitium DNS and Android TV. One install through HACS, you pick the cards. Zero dependency, built-in visual editor.",
     cta_gh: "View on GitHub", cta_install: "Install",
     facts: (n, c) => [`<b>${n}</b> cards`, `<b>${c}</b> categories`, "Visual editor", "Zero dependency"],
     h_install: "Install with HACS",
-    install_lead: "Five steps, two minutes. HACS handles the download and future updates.",
+    install_lead: "One integration, five steps, two minutes. HACS handles the download and future updates.",
     steps: [
       "In HACS, open the <b>⋮</b> menu, then <b>Custom repositories</b>.",
-      "Paste the repository URL and pick the <b>Dashboard</b> type.",
-      "Search for <b>Homelab Cards</b> and click <b>Download</b>.",
-      "Reload your browser (<code>Ctrl+Shift+R</code>) to load the cards.",
-      "Edit a dashboard → <b>Add card</b> → pick a Homelab card.",
+      "Add the repository URL with the <b>Integration</b> type.",
+      "Search for <b>Homelab Cards</b>, click <b>Download</b>, then restart Home Assistant.",
+      "<b>Settings</b> → <b>Devices &amp; services</b> → <b>Add integration</b> → <b>Homelab Cards</b>, then tick the cards you want.",
+      "Reload your browser (<code>Ctrl+Shift+R</code>), then <b>Add card</b> on a dashboard.",
     ],
     copy: "Copy", copied: "Copied",
     quick_h: "My Home Assistant shortcut",
     quick_p: "Opens the repository straight in your instance's HACS, no copy-paste needed.",
     quick_btn: "Open in HACS",
-    no_yaml: "HACS registers the resource for you: nothing to add to configuration.yaml.",
+    no_yaml: "The integration loads the ticked cards itself: no resource to declare, even with a YAML-mode dashboard.",
+    pick_h: "Pick your cards",
+    pick_p: "When you add the integration, a screen lists every card: tick the ones you need, only those get loaded.",
+    pick_perks: [
+      ["Loaded automatically", "Each ticked card is served as its own file and loaded by Home Assistant."],
+      ["Change it anytime", "Settings → Devices & services → Homelab Cards → Configure, then reload your browser."],
+    ],
+    pick_win: "Cards to load", pick_submit: "Submit",
     h_cards: "The cards",
     cards_lead: "Each card reads entities from a Home Assistant integration. Filter by category, click a screenshot to enlarge it.",
     all: "All", shown: (n) => `${n} card${n > 1 ? "s" : ""} shown`,
@@ -109,6 +123,10 @@ function render() {
   $("#facts").innerHTML = t.facts(data.cards.length, cats.length).map((f) => `<li>${icon("check")}<span>${f}</span></li>`).join("");
 
   $("#steps").innerHTML = t.steps.map((s, i) => `<li>${s}${i === 1 ? `<div class="copy"><code id="repo-url">${REPO}</code><button type="button" data-copy>${icon("copy")}<span>${t.copy}</span></button></div>` : ""}</li>`).join("");
+
+  $("#pick-perks").innerHTML = t.pick_perks.map(([h, p]) => `<li>${icon("check")}<span><b>${h}</b>${p}</span></li>`).join("");
+  // Illustrative only: every other card shown ticked.
+  $("#pick-list").innerHTML = data.cards.map((c, k) => `<li class="${k % 2 ? "" : "on"}"><span class="box">${icon("check")}</span>${esc(short(c))}</li>`).join("");
 
   $("#filters").setAttribute("aria-label", t.h_cards);
   $("#filters").innerHTML = [["all", t.all, data.cards.length], ...cats.map(([id, n]) => [id, n[lang], data.cards.filter((c) => c.category === id).length])]

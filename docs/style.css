@@ -244,3 +244,19 @@ footer{padding:40px 0 48px;color:var(--muted);font-size:.9rem}
 @media (prefers-reduced-motion:no-preference){.lightbox[open]{animation:pop .35s var(--ease)}@keyframes pop{from{opacity:0;scale:.96}}}
 
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition-duration:.01ms!important;animation:none!important}}
+
+/* Pick your cards */
+.pick{display:grid;gap:24px;align-items:center;margin-top:48px}
+@media (min-width:900px){.pick{grid-template-columns:1fr 1fr;gap:40px}}
+.pick-copy h3{margin:0 0 10px;font-size:clamp(1.3rem,1.1rem + .8vw,1.7rem)}
+.pick-copy>p{margin:0 0 24px;color:var(--muted)}
+.pick-copy .perks{margin:0;grid-template-columns:1fr}
+.pick-body{padding:18px 20px 20px;color:#e5edf3}
+.pick-body p{margin:0 0 12px;font-size:.88rem;color:#8fa3b2}
+.pick-body ul{list-style:none;margin:0 0 18px;padding:0;display:grid;gap:4px;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr))}
+.pick-body li{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:.82rem;padding:6px 8px;border-radius:8px;min-width:0;overflow-wrap:anywhere}
+.pick-body li.on{background:rgb(3 169 244 / .1)}
+.pick-body .box{flex:none;display:grid;place-items:center;width:18px;height:18px;border-radius:5px;border:1.5px solid #4a5a67;color:transparent}
+.pick-body li.on .box{background:#03a9f4;border-color:#03a9f4;color:#04202f}
+.pick-body .box .ic{width:13px;height:13px;stroke-width:2.6}
+.pick-btn{display:inline-block;background:#03a9f4;color:#04202f;font-weight:600;font-size:.88rem;padding:8px 16px;border-radius:8px}

@@ -1,0 +1,13 @@
+{
+  "domain": "homelab_cards",
+  "name": "Homelab Cards",
+  "codeowners": ["@Kenny3231"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http"],
+  "documentation": "https://github.com/Kenny3231/ha-homelab-cards",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/Kenny3231/ha-homelab-cards/issues",
+  "requirements": [],
+  "version": "2.0.0"
+}

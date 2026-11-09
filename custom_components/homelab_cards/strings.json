@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Homelab Cards",
+        "description": "Choose the cards to load on your dashboards. No resource to declare by hand.",
+        "data": {
+          "cards": "Cards"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Homelab Cards is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Homelab Cards",
+        "description": "Choose the cards to load. Reload the browser page after saving.",
+        "data": {
+          "cards": "Cards"
+        }
+      }
+    }
+  }
+}

@@ -2,24 +2,19 @@
 
 [Français](README.fr.md) · [Website](https://kenny3231.github.io/ha-homelab-cards/) · [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
 
-Lovelace cards for Home Assistant homelabs: UniFi, Proxmox, Synology, Transmission, Technitium DNS, Android TV and more. Zero dependency, visual editor included, one HACS install.
+Lovelace cards for Home Assistant homelabs: UniFi, Proxmox, Synology, Transmission, Technitium DNS, Android TV and more. Zero dependency, visual editor included, one HACS install, pick the cards you want.
 
 ## Installation (HACS)
 
 1. In HACS, open the menu (⋮) → **Custom repositories**.
-2. Add `https://github.com/Kenny3231/ha-homelab-cards` with type **Dashboard** (a.k.a. *Lovelace*).
-3. Search for **Homelab Cards**, click **Download**.
-4. Reload your browser (Ctrl+Shift+R). HACS registers the resource itself: **nothing to add in `configuration.yaml`**.
-5. Edit a dashboard → **Add card** → search the card name (e.g. “UniFi Gateway”).
+2. Add `https://github.com/Kenny3231/ha-homelab-cards` with type **Integration**.
+3. Search for **Homelab Cards**, click **Download**, then **restart Home Assistant**.
+4. Settings → Devices & services → **Add integration** → **Homelab Cards**, tick the cards you want.
+5. Reload your browser (Ctrl+Shift+R). Edit a dashboard → **Add card** → search the card name (e.g. “UniFi Gateway”).
 
-**YAML-mode dashboards**: HACS cannot register the resource. Add it yourself under `lovelace: resources:` in `configuration.yaml`, then restart:
+**No resource to declare**: the integration loads the cards by itself, including with YAML-mode dashboards. Change the selection later in the integration options.
 
-```yaml
-- url: /local/community/ha-homelab-cards/ha-homelab-cards.js
-  type: module
-```
-
-Manual install: copy `dist/ha-homelab-cards.js` to `/config/www/` and add the resource `/local/ha-homelab-cards.js` (type *JavaScript module*).
+Manual install: copy `custom_components/homelab_cards` to `/config/custom_components/` and restart.
 
 ## Required integrations
 
@@ -90,7 +85,7 @@ Every card has a visual editor: use it to pick your entities.
 
 ## Contributing
 
-Issues and pull requests are welcome. Cards live in `src/cards/<category>/`; run `npm run build` to regenerate `dist/` and `npm run docs` for the READMEs.
+Issues and pull requests are welcome. Cards live in `custom_components/homelab_cards/cards/<category>/` (picked up automatically); run `npm run check` then `npm run docs` for the READMEs.
 
 ## License
 

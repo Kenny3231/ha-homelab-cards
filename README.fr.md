@@ -2,24 +2,19 @@
 
 [English](README.md) · [Site](https://kenny3231.github.io/ha-homelab-cards/) · [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
 
-Cartes Lovelace pour homelab Home Assistant : UniFi, Proxmox, Synology, Transmission, Technitium DNS, Android TV et plus. Zéro dépendance, éditeur visuel inclus, une seule installation HACS.
+Cartes Lovelace pour homelab Home Assistant : UniFi, Proxmox, Synology, Transmission, Technitium DNS, Android TV et plus. Zéro dépendance, éditeur visuel inclus, une seule installation HACS, vous choisissez les cartes.
 
 ## Installation (HACS)
 
 1. Dans HACS, ouvrez le menu (⋮) → **Dépôts personnalisés**.
-2. Ajoutez `https://github.com/Kenny3231/ha-homelab-cards` avec le type **Tableau de bord** (*Lovelace*).
-3. Cherchez **Homelab Cards** puis cliquez sur **Télécharger**.
-4. Rechargez le navigateur (Ctrl+Shift+R). HACS déclare la ressource lui-même : **rien à ajouter dans `configuration.yaml`**.
-5. Modifiez un tableau de bord → **Ajouter une carte** → cherchez le nom de la carte (ex. « UniFi Gateway »).
+2. Ajoutez `https://github.com/Kenny3231/ha-homelab-cards` avec le type **Intégration**.
+3. Cherchez **Homelab Cards**, cliquez sur **Télécharger**, puis **redémarrez Home Assistant**.
+4. Paramètres → Appareils et services → **Ajouter une intégration** → **Homelab Cards**, cochez les cartes voulues.
+5. Rechargez le navigateur (Ctrl+Shift+R). Modifiez un tableau de bord → **Ajouter une carte** → cherchez le nom de la carte (ex. « UniFi Gateway »).
 
-**Tableaux de bord en mode YAML** : HACS ne peut pas déclarer la ressource. Ajoutez-la vous-même dans `lovelace: resources:` de `configuration.yaml`, puis redémarrez :
+**Aucune ressource à déclarer** : l'intégration charge les cartes toute seule, même avec des tableaux de bord en mode YAML. Modifiez la sélection plus tard dans les options de l'intégration.
 
-```yaml
-- url: /local/community/ha-homelab-cards/ha-homelab-cards.js
-  type: module
-```
-
-Installation manuelle : copiez `dist/ha-homelab-cards.js` dans `/config/www/` et ajoutez la ressource `/local/ha-homelab-cards.js` (type *Module JavaScript*).
+Installation manuelle : copiez `custom_components/homelab_cards` dans `/config/custom_components/` puis redémarrez.
 
 ## Intégrations requises
 
@@ -90,7 +85,7 @@ Chaque carte possède un éditeur visuel : utilisez-le pour choisir vos entités
 
 ## Contribuer
 
-Issues et pull requests bienvenues. Les cartes sont dans `src/cards/<catégorie>/` ; `npm run build` régénère `dist/`, `npm run docs` les README.
+Issues et pull requests bienvenues. Les cartes sont dans `custom_components/homelab_cards/cards/<catégorie>/` (prises en compte automatiquement) ; `npm run check` puis `npm run docs` pour les README.
 
 ## Licence
 
